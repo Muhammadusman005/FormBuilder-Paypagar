@@ -1,4 +1,12 @@
-export const API_ENDPOINTS = {
+const url = {
+    local: import.meta.env.VITE_API_ENDPOINT_LOCAL,
+    dev: import.meta.env.VITE_API_ENDPOINT_DEVELOPMENT,
+    prod: import.meta.env.VITE_API_ENDPOINT_PRODUCTION,
+} 
+
+
+export const baseUrl = url.dev; 
+export const ENDPOINTS = {
   FORMS: {
     BASE: '/api/forms',
     GET_ALL: '/api/forms',
@@ -13,3 +21,6 @@ export const API_ENDPOINTS = {
   },
   LOGIN: '/users/v1/admin-login'
 };
+
+// Alias for backward compatibility
+export const API_ENDPOINTS = ENDPOINTS;

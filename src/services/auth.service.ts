@@ -1,5 +1,5 @@
 import api from './api';
-import { API_ENDPOINTS } from './endpoints';
+import { ENDPOINTS } from './endpoints';
 
 export interface LoginPayload {
   email: string;
@@ -17,14 +17,24 @@ export interface AuthUser {
   roleName: string;
 }
 
+// API response envelope shape
+interface LoginResponse {
+  success: boolean;
+  message: string;
+  data: AuthUser;
+  statusCode: number;
+}
+
 const TOKEN_KEY = 'auth_token';
-const USER_KEY = 'auth_user';
+const USER_KEY  = 'auth_user';
 
 export const AuthService = {
   login: async (payload: LoginPayload): Promise<AuthUser> => {
-    // api interceptor returns response.data, so shape is { success, data, ... }
-    const res: any = await api.post(API_ENDPOINTS.LOGIN, payload);
-    const user: AuthUser = res.data;
+    // Interceptor unwraps axios response.data → we get the envelope directly
+    // Shape: { success: true, data: { id, email, token, ... } }
+    const res = await api.post<LoginResponse, LoginResponse>(ENDPOINTS.LOGIN, payload);
+    const user = res.data;
+
     localStorage.setItem(TOKEN_KEY, user.token);
     localStorage.setItem(USER_KEY, JSON.stringify(user));
     return user;
@@ -35,16 +45,12 @@ export const AuthService = {
     localStorage.removeItem(USER_KEY);
   },
 
-  getToken: (): string | null => {
-    return localStorage.getItem(TOKEN_KEY);
-  },
+  getToken: (): string | null => localStorage.getItem(TOKEN_KEY),
 
   getUser: (): AuthUser | null => {
     const raw = localStorage.getItem(USER_KEY);
-    return raw ? JSON.parse(raw) : null;
+    return raw ? (JSON.parse(raw) as AuthUser) : null;
   },
 
-  isAuthenticated: (): boolean => {
-    return !!localStorage.getItem(TOKEN_KEY);
-  },
+  isAuthenticated: (): boolean => !!localStorage.getItem(TOKEN_KEY),
 };

@@ -1,8 +1,11 @@
-import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Builder } from './pages/Admin/Builder';
 import { Dashboard } from './pages/Admin/Dashboard';
 import { SubmitForm } from './pages/Public/SubmitForm';
+import { Login } from './pages/Auth/Login';
 import { Navbar } from './components/Navbar';
+import { ProtectedRoute } from './components/ProtectedRoute';
+import { AuthService } from './services/auth.service';
 
 const Layout = () => {
   const { pathname } = useLocation();
@@ -26,7 +29,27 @@ const Layout = () => {
 function App() {
   return (
     <Router>
-      <Layout />
+      <Routes>
+        {/* Public: redirect to dashboard if already logged in */}
+        <Route
+          path="/login"
+          element={
+            AuthService.isAuthenticated()
+              ? <Navigate to="/" replace />
+              : <Login />
+          }
+        />
+
+        {/* All admin routes are protected */}
+        <Route
+          path="/*"
+          element={
+            <ProtectedRoute>
+              <Layout />
+            </ProtectedRoute>
+          }
+        />
+      </Routes>
     </Router>
   );
 }

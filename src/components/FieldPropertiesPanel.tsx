@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { FormField, FieldType } from '../types/form';
+import type { FormField } from '../types/form';
 import { X, Plus, Trash2 } from 'lucide-react';
 
 interface Props {

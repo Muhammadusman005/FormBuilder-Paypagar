@@ -6,20 +6,45 @@ export interface LoginPayload {
   password: string;
 }
 
+export interface AuthUser {
+  id: number;
+  email: string;
+  firstName: string;
+  lastName: string;
+  token: string;
+  isAdmin: boolean;
+  companyName: string;
+  roleName: string;
+}
+
+const TOKEN_KEY = 'auth_token';
+const USER_KEY = 'auth_user';
+
 export const AuthService = {
-  login: async (payload: LoginPayload) => {
-    const response: any = await api.post(API_ENDPOINTS.LOGIN, payload);
-    if (response?.token) {
-      localStorage.setItem('token', response.token);
-    }
-    return response;
+  login: async (payload: LoginPayload): Promise<AuthUser> => {
+    // api interceptor returns response.data, so shape is { success, data, ... }
+    const res: any = await api.post(API_ENDPOINTS.LOGIN, payload);
+    const user: AuthUser = res.data;
+    localStorage.setItem(TOKEN_KEY, user.token);
+    localStorage.setItem(USER_KEY, JSON.stringify(user));
+    return user;
   },
 
   logout: () => {
-    localStorage.removeItem('token');
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
   },
 
-  isAuthenticated: () => {
-    return !!localStorage.getItem('token');
+  getToken: (): string | null => {
+    return localStorage.getItem(TOKEN_KEY);
+  },
+
+  getUser: (): AuthUser | null => {
+    const raw = localStorage.getItem(USER_KEY);
+    return raw ? JSON.parse(raw) : null;
+  },
+
+  isAuthenticated: (): boolean => {
+    return !!localStorage.getItem(TOKEN_KEY);
   },
 };

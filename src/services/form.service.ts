@@ -1,4 +1,4 @@
-import api from './api';
+import api from './axios';
 import { API_ENDPOINTS } from './endpoints';
 
 export interface FormMetadata {

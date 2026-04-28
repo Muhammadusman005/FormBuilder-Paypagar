@@ -1,4 +1,4 @@
-import api from './api';
+import api from './axios';
 import { ENDPOINTS } from './endpoints';
 
 export interface LoginPayload {

@@ -23,7 +23,7 @@ export const FormFieldPreview = ({ field, isSelected, onDelete, onSelect, isDrag
   return (
     <div
       onClick={() => onSelect(field)}
-      className={`group relative bg-white rounded-lg border-2 transition-all cursor-pointer h-full ${
+      className={`group relative bg-white rounded-lg border-2 transition-all cursor-pointer h-full overflow-hidden ${
         isDragging
           ? 'opacity-40 scale-95 border-indigo-400 shadow-lg'
           : isSelected
@@ -35,19 +35,19 @@ export const FormFieldPreview = ({ field, isSelected, onDelete, onSelect, isDrag
         <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-500 rounded-l-lg" />
       )}
 
-      <div className="flex items-center gap-2 px-3 py-2.5">
+      <div className="flex items-center gap-2 px-3 py-2.5 overflow-hidden">
         <GripVertical className="w-4 h-4 text-slate-300 group-hover:text-slate-400 flex-shrink-0 cursor-move" />
 
         <div className={`flex items-center justify-center w-6 h-6 rounded-md border flex-shrink-0 ${meta.color}`}>
           <Icon className="w-3 h-3" />
         </div>
 
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 overflow-hidden">
           <p className="text-xs font-medium text-slate-800 truncate">
             {field.label}
             {field.required && <span className="text-red-500 ml-0.5">*</span>}
           </p>
-          <p className="text-xs text-slate-400">{meta.label}</p>
+          <p className="text-xs text-slate-400 truncate">{meta.label}</p>
         </div>
 
         <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
@@ -69,25 +69,25 @@ export const FormFieldPreview = ({ field, isSelected, onDelete, onSelect, isDrag
       </div>
 
       {/* Input preview */}
-      <div className="px-3 pb-3">
+      <div className="px-3 pb-3 overflow-hidden">
         {field.type === 'text' && (
-          <div className="h-7 bg-slate-50 border border-slate-200 rounded px-2 flex items-center">
-            <span className="text-xs text-slate-400 truncate">{field.placeholder || 'Enter text...'}</span>
+          <div className="h-7 bg-slate-50 border border-slate-200 rounded px-2 flex items-center overflow-hidden">
+            <span className="text-xs text-slate-400 truncate w-full">{field.placeholder || 'Enter text...'}</span>
           </div>
         )}
         {field.type === 'number' && (
-          <div className="h-7 bg-slate-50 border border-slate-200 rounded px-2 flex items-center">
-            <span className="text-xs text-slate-400 truncate">{field.placeholder || 'Enter number...'}</span>
+          <div className="h-7 bg-slate-50 border border-slate-200 rounded px-2 flex items-center overflow-hidden">
+            <span className="text-xs text-slate-400 truncate w-full">{field.placeholder || 'Enter number...'}</span>
           </div>
         )}
         {field.type === 'dropdown' && (
-          <div className="h-7 bg-slate-50 border border-slate-200 rounded px-2 flex items-center justify-between">
-            <span className="text-xs text-slate-400 truncate">{field.placeholder || 'Select an option'}</span>
-            <ChevronDown className="w-3 h-3 text-slate-400 flex-shrink-0" />
+          <div className="h-7 bg-slate-50 border border-slate-200 rounded px-2 flex items-center justify-between overflow-hidden">
+            <span className="text-xs text-slate-400 truncate flex-1">{field.placeholder || 'Select an option'}</span>
+            <ChevronDown className="w-3 h-3 text-slate-400 flex-shrink-0 ml-1" />
           </div>
         )}
         {field.type === 'file' && (
-          <div className="h-7 bg-slate-50 border border-dashed border-slate-300 rounded px-2 flex items-center gap-1">
+          <div className="h-7 bg-slate-50 border border-dashed border-slate-300 rounded px-2 flex items-center gap-1 overflow-hidden">
             <Upload className="w-3 h-3 text-slate-400 flex-shrink-0" />
             <span className="text-xs text-slate-400 truncate">Upload file</span>
           </div>

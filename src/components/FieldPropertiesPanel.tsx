@@ -101,7 +101,7 @@ export const FieldPropertiesPanel = ({ field, onUpdate, onClose }: Props) => {
             type="text"
             value={label}
             onChange={(e) => handleChange({ label: e.target.value })}
-            className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 overflow-hidden text-ellipsis"
           />
         </div>
 

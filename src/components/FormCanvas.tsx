@@ -34,7 +34,6 @@ export const FormCanvas = ({
   };
 
   const handleDragLeave = (e: React.DragEvent) => {
-    // Only trigger if leaving the canvas entirely
     if (!e.currentTarget.contains(e.relatedTarget as Node)) {
       setIsDragOver(false);
     }
@@ -47,8 +46,7 @@ export const FormCanvas = ({
 
   return (
     <div className="flex-1 overflow-y-auto p-6 bg-slate-100">
-      <div className="max-w-2xl mx-auto">
-        {/* Form title */}
+      <div className="max-w-3xl mx-auto">
         <p className="text-xs font-medium text-slate-400 uppercase tracking-wide mb-3">Canvas</p>
 
         <div
@@ -61,10 +59,12 @@ export const FormCanvas = ({
               : 'border-slate-200 hover:border-slate-300'
           }`}
         >
-          {/* Form header preview */}
+          {/* Form header */}
           <div className="px-6 pt-5 pb-4 border-b border-slate-100">
             <h2 className="text-base font-semibold text-slate-900">{title || 'Untitled Form'}</h2>
-            <p className="text-xs text-slate-400 mt-0.5">{fields.length} field{fields.length !== 1 ? 's' : ''}</p>
+            <p className="text-xs text-slate-400 mt-0.5">
+              {fields.length} field{fields.length !== 1 ? 's' : ''}
+            </p>
           </div>
 
           <div className="p-4">
@@ -79,7 +79,8 @@ export const FormCanvas = ({
                 <p className="text-xs text-slate-400 mt-1">Your form fields will appear here</p>
               </div>
             ) : (
-              <div className="space-y-2">
+              /* 4-column grid using inline styles to avoid Tailwind purging */
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
                 {fields.map((field) => (
                   <div
                     key={field.id}
@@ -87,6 +88,7 @@ export const FormCanvas = ({
                     onDragStart={() => onFieldDragStart(field.id)}
                     onDragOver={(e) => e.preventDefault()}
                     onDrop={() => onFieldDrop(field.id)}
+                    style={{ gridColumn: `span ${field.colSpan ?? 4}` }}
                   >
                     <FormFieldPreview
                       field={field}
@@ -98,9 +100,11 @@ export const FormCanvas = ({
                   </div>
                 ))}
 
-                {/* Drop zone at bottom when fields exist */}
                 {isDragOver && (
-                  <div className="h-12 border-2 border-dashed border-indigo-300 rounded-lg bg-indigo-50 flex items-center justify-center">
+                  <div
+                    style={{ gridColumn: 'span 4' }}
+                    className="h-12 border-2 border-dashed border-indigo-300 rounded-lg bg-indigo-50 flex items-center justify-center"
+                  >
                     <p className="text-xs text-indigo-500 font-medium">Drop here</p>
                   </div>
                 )}

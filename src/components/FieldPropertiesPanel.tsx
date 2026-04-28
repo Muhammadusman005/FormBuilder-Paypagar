@@ -8,19 +8,27 @@ interface Props {
   onClose: () => void;
 }
 
+const COL_OPTIONS: { value: 1 | 2 | 3 | 4; label: string; desc: string }[] = [
+  { value: 1, label: '1/4', desc: 'Quarter' },
+  { value: 2, label: '1/2', desc: 'Half' },
+  { value: 3, label: '3/4', desc: 'Three quarters' },
+  { value: 4, label: 'Full', desc: 'Full width' },
+];
+
 export const FieldPropertiesPanel = ({ field, onUpdate, onClose }: Props) => {
   const [label, setLabel] = useState('');
   const [placeholder, setPlaceholder] = useState('');
   const [required, setRequired] = useState(false);
   const [options, setOptions] = useState<string[]>([]);
+  const [colSpan, setColSpan] = useState<1 | 2 | 3 | 4>(4);
 
-  // Sync state when selected field changes
   useEffect(() => {
     if (field) {
       setLabel(field.label);
       setPlaceholder(field.placeholder || '');
       setRequired(field.required);
       setOptions(field.options || []);
+      setColSpan(field.colSpan ?? 4);
     }
   }, [field?.id]);
 
@@ -35,12 +43,13 @@ export const FieldPropertiesPanel = ({ field, onUpdate, onClose }: Props) => {
   }
 
   const handleChange = (updates: Partial<FormField>) => {
-    const updated = { ...field, label, placeholder, required, options, ...updates };
+    const updated = { ...field, label, placeholder, required, options, colSpan, ...updates };
     onUpdate(updated);
     if ('label' in updates) setLabel(updates.label!);
     if ('placeholder' in updates) setPlaceholder(updates.placeholder!);
     if ('required' in updates) setRequired(updates.required!);
     if ('options' in updates) setOptions(updates.options!);
+    if ('colSpan' in updates) setColSpan(updates.colSpan!);
   };
 
   const addOption = () => {
@@ -110,6 +119,43 @@ export const FieldPropertiesPanel = ({ field, onUpdate, onClose }: Props) => {
             />
           </div>
         )}
+
+        {/* Width */}
+        <div>
+          <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+            Width
+          </label>
+          {/* Visual grid preview */}
+          <div className="grid grid-cols-4 gap-1 mb-2">
+            {[1, 2, 3, 4].map((col) => (
+              <div
+                key={col}
+                className={`h-2 rounded-sm transition-colors ${
+                  col <= colSpan ? 'bg-indigo-500' : 'bg-slate-200'
+                }`}
+              />
+            ))}
+          </div>
+          <div className="grid grid-cols-4 gap-1">
+            {COL_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => handleChange({ colSpan: opt.value })}
+                title={opt.desc}
+                className={`py-1.5 text-xs font-medium rounded-md border transition-all ${
+                  colSpan === opt.value
+                    ? 'bg-indigo-600 text-white border-indigo-600'
+                    : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300 hover:text-indigo-600'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-slate-400 mt-1.5">
+            {COL_OPTIONS.find(o => o.value === colSpan)?.desc} — {colSpan} of 4 columns
+          </p>
+        </div>
 
         {/* Dropdown Options */}
         {field.type === 'dropdown' && (

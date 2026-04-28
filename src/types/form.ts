@@ -6,7 +6,15 @@ export interface FormField {
   label: string;
   required: boolean;
   placeholder?: string;
-  options?: string[]; // for dropdown
+  options?: string[];
+  colSpan?: 1 | 2 | 3 | 4; // out of 4 columns, default 4 (full width)
+}
+
+export interface FormSchema {
+  id: string;
+  title: string;
+  fields: FormField[];
+  status: 'draft' | 'published';
 }
 
 export interface FormSchema {

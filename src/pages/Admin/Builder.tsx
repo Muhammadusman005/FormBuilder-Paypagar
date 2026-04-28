@@ -4,9 +4,10 @@ import type { FormField, FormSchema } from '../../types/form';
 import { FieldPalette } from '../../components/FieldPalette';
 import { FormCanvas } from '../../components/FormCanvas';
 import { FormPreview } from '../../components/FormPreview';
+import { FormJsonView } from '../../components/FormJsonView';
 import { FieldPropertiesPanel } from '../../components/FieldPropertiesPanel';
 import { FIELD_COMPONENTS } from '../../components/FieldComponents';
-import { Save, ArrowLeft, CheckCircle, Circle, Eye, Pencil } from 'lucide-react';
+import { Save, ArrowLeft, CheckCircle, Circle, Eye, Pencil, Braces } from 'lucide-react';
 
 export const Builder = () => {
   const [title, setTitle] = useState('Untitled Form');
@@ -16,7 +17,7 @@ export const Builder = () => {
   const [selectedField, setSelectedField] = useState<FormField | null>(null);
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [draggedComponentType, setDraggedComponentType] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'designer' | 'preview'>('designer');
+  const [activeTab, setActiveTab] = useState<'designer' | 'preview' | 'json'>('designer');
   const [formData, setFormData] = useState<Record<string, any>>({});
 
   // ── Palette drag ──────────────────────────────────────────────
@@ -121,7 +122,7 @@ export const Builder = () => {
         </div>
 
         <div className="flex items-center gap-2 flex-shrink-0">
-          {/* Designer / Preview tabs */}
+          {/* Designer / Preview / JSON tabs */}
           <div className="flex items-center bg-slate-100 rounded-lg p-0.5 gap-0.5">
             <button
               onClick={() => setActiveTab('designer')}
@@ -142,6 +143,16 @@ export const Builder = () => {
               }`}
             >
               <Eye className="w-3.5 h-3.5" /> Preview
+            </button>
+            <button
+              onClick={() => setActiveTab('json')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                activeTab === 'json'
+                  ? 'bg-white text-slate-800 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <Braces className="w-3.5 h-3.5" /> JSON
             </button>
           </div>
 
@@ -204,7 +215,7 @@ export const Builder = () => {
               onClose={() => setSelectedField(null)}
             />
           </>
-        ) : (
+        ) : activeTab === 'preview' ? (
           <FormPreview
             title={title}
             fields={fields}
@@ -212,6 +223,8 @@ export const Builder = () => {
             onInputChange={handlePreviewInputChange}
             onSubmit={handlePreviewSubmit}
           />
+        ) : (
+          <FormJsonView title={title} fields={fields} />
         )}
       </div>
     </div>

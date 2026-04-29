@@ -7,79 +7,156 @@ interface Props {
   fields: FormField[];
   formData: Record<string, any>;
   onInputChange: (fieldId: string, value: any) => void;
-  onSubmit: (e: React.FormEvent) => void;
+  onSubmit: () => void;
 }
 
-const FieldInput = ({
+function validateField(field: FormField, value: string): string | null {
+  const v = field.validation;
+
+  // Required check
+  if (field.required && !value.trim()) {
+    return `${field.label} is required`;
+  }
+
+  // Skip further validation if empty and not required
+  if (!value.trim()) return null;
+  if (!v) return null;
+
+  if (field.type === 'text') {
+    if (v.minLength !== undefined && value.length < v.minLength)
+      return v.validationMessage || `Minimum ${v.minLength} characters required`;
+    if (v.maxLength !== undefined && value.length > v.maxLength)
+      return v.validationMessage || `Maximum ${v.maxLength} characters allowed`;
+    if (v.regex) {
+      try {
+        if (!new RegExp(v.regex).test(value))
+          return v.validationMessage || `Invalid format`;
+      } catch {
+        // invalid regex — skip
+      }
+    }
+  }
+
+  if (field.type === 'number') {
+    const num = Number(value);
+    if (v.min !== undefined && num < v.min)
+      return v.validationMessage || `Minimum value is ${v.min}`;
+    if (v.max !== undefined && num > v.max)
+      return v.validationMessage || `Maximum value is ${v.max}`;
+  }
+
+  return null;
+}
+
+function FieldInput({
   field,
   formData,
   onInputChange,
   resetKey,
+  error,
+  onError,
 }: {
   field: FormField;
   formData: Record<string, any>;
   onInputChange: (id: string, value: any) => void;
   resetKey: number;
-}) => (
-  <div>
-    <label className="block text-sm font-medium text-slate-700 mb-2">
-      {field.label}
-      {field.required && <span className="text-red-500 ml-1">*</span>}
-    </label>
+  error: string | null;
+  onError: (id: string, err: string | null) => void;
+}) {
+  const handleChange = (value: string) => {
+    onInputChange(field.id, value);
+    onError(field.id, validateField(field, value));
+  };
 
-    {field.type === 'text' && (
-      <input
-        type="text"
-        placeholder={field.placeholder}
-        value={formData[field.id] || ''}
-        onChange={(e) => onInputChange(field.id, e.target.value)}
-        required={field.required}
-        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-      />
-    )}
+  return (
+    <div>
+      <label className="block text-sm font-medium text-slate-700 mb-2">
+        {field.label}
+        {field.required && <span className="text-red-500 ml-1">*</span>}
+      </label>
 
-    {field.type === 'number' && (
-      <input
-        type="number"
-        placeholder={field.placeholder}
-        value={formData[field.id] || ''}
-        onChange={(e) => onInputChange(field.id, e.target.value)}
-        required={field.required}
-        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-      />
-    )}
+      {field.type === 'text' && (
+        <input
+          type="text"
+          placeholder={field.placeholder}
+          value={formData[field.id] || ''}
+          onChange={(e) => handleChange(e.target.value)}
+          className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+            error ? 'border-red-400 focus:ring-red-400' : 'border-slate-300 focus:ring-indigo-500'
+          }`}
+        />
+      )}
 
-    {field.type === 'dropdown' && (
-      <select
-        value={formData[field.id] || ''}
-        onChange={(e) => onInputChange(field.id, e.target.value)}
-        required={field.required}
-        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-      >
-        <option value="">{field.placeholder || 'Select an option'}</option>
-        {field.options?.map((opt) => (
-          <option key={opt} value={opt}>{opt}</option>
-        ))}
-      </select>
-    )}
+      {field.type === 'number' && (
+        <input
+          type="number"
+          placeholder={field.placeholder}
+          value={formData[field.id] || ''}
+          onChange={(e) => handleChange(e.target.value)}
+          className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+            error ? 'border-red-400 focus:ring-red-400' : 'border-slate-300 focus:ring-indigo-500'
+          }`}
+        />
+      )}
 
-    {field.type === 'file' && (
-      <input
-        key={resetKey}
-        type="file"
-        onChange={(e) => onInputChange(field.id, e.target.files?.[0])}
-        required={field.required}
-        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-      />
-    )}
-  </div>
-);
+      {field.type === 'dropdown' && (
+        <select
+          value={formData[field.id] || ''}
+          onChange={(e) => onInputChange(field.id, e.target.value)}
+          className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+            error ? 'border-red-400 focus:ring-red-400' : 'border-slate-300 focus:ring-indigo-500'
+          }`}
+        >
+          <option value="">{field.placeholder || 'Select an option'}</option>
+          {field.options?.map((opt) => (
+            <option key={opt} value={opt}>{opt}</option>
+          ))}
+        </select>
+      )}
+
+      {field.type === 'file' && (
+        <input
+          key={resetKey}
+          type="file"
+          onChange={(e) => onInputChange(field.id, e.target.files?.[0])}
+          className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+            error ? 'border-red-400 focus:ring-red-400' : 'border-slate-300 focus:ring-indigo-500'
+          }`}
+        />
+      )}
+
+      {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
+    </div>
+  );
+}
 
 export const FormPreview = ({ title, fields, formData, onInputChange, onSubmit }: Props) => {
   const [resetKey, setResetKey] = useState(0);
+  const [errors, setErrors] = useState<Record<string, string | null>>({});
+
+  const handleError = (id: string, err: string | null) => {
+    setErrors(prev => ({ ...prev, [id]: err }));
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
-    onSubmit(e);
+    e.preventDefault();
+
+    // Validate all fields on submit
+    const newErrors: Record<string, string | null> = {};
+    let hasError = false;
+
+    for (const field of fields) {
+      const value = String(formData[field.id] ?? '');
+      const err = validateField(field, value);
+      newErrors[field.id] = err;
+      if (err) hasError = true;
+    }
+
+    setErrors(newErrors);
+    if (hasError) return;
+
+    onSubmit();
+    setErrors({});
     setResetKey(k => k + 1);
   };
 
@@ -98,7 +175,7 @@ export const FormPreview = ({ title, fields, formData, onInputChange, onSubmit }
               <p className="text-sm">No fields added yet. Add fields in Designer tab to preview.</p>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="p-6">
+            <form onSubmit={handleSubmit} noValidate className="p-6">
               <div
                 style={{
                   display: 'grid',
@@ -114,6 +191,8 @@ export const FormPreview = ({ title, fields, formData, onInputChange, onSubmit }
                       formData={formData}
                       onInputChange={onInputChange}
                       resetKey={resetKey}
+                      error={errors[field.id] ?? null}
+                      onError={handleError}
                     />
                   </div>
                 ))}

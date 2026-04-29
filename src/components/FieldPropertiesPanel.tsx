@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import type { FormField } from '../types/form';
-import { X, Plus, Trash2 } from 'lucide-react';
+import type { FormField, FieldValidation } from '../types/form';
+import { X, Plus, Trash2, ShieldCheck } from 'lucide-react';
 
 interface Props {
   field: FormField | null;
@@ -21,6 +21,7 @@ export const FieldPropertiesPanel = ({ field, onUpdate, onClose }: Props) => {
   const [required, setRequired] = useState(false);
   const [options, setOptions] = useState<string[]>([]);
   const [colSpan, setColSpan] = useState<1 | 2 | 3 | 4>(4);
+  const [validation, setValidation] = useState<FieldValidation>({});
 
   useEffect(() => {
     if (field) {
@@ -29,6 +30,7 @@ export const FieldPropertiesPanel = ({ field, onUpdate, onClose }: Props) => {
       setRequired(field.required);
       setOptions(field.options || []);
       setColSpan(field.colSpan ?? 4);
+      setValidation(field.validation || {});
     }
   }, [field?.id]);
 
@@ -43,13 +45,23 @@ export const FieldPropertiesPanel = ({ field, onUpdate, onClose }: Props) => {
   }
 
   const handleChange = (updates: Partial<FormField>) => {
-    const updated = { ...field, label, placeholder, required, options, colSpan, ...updates };
+    const updated = { ...field, label, placeholder, required, options, colSpan, validation, ...updates };
     onUpdate(updated);
     if ('label' in updates) setLabel(updates.label!);
     if ('placeholder' in updates) setPlaceholder(updates.placeholder!);
     if ('required' in updates) setRequired(updates.required!);
     if ('options' in updates) setOptions(updates.options!);
     if ('colSpan' in updates) setColSpan(updates.colSpan!);
+    if ('validation' in updates) setValidation(updates.validation!);
+  };
+
+  const handleValidationChange = (patch: Partial<FieldValidation>) => {
+    const updated = { ...validation, ...patch };
+    // Remove undefined keys to keep it clean
+    (Object.keys(updated) as (keyof FieldValidation)[]).forEach((k) => {
+      if (updated[k] === undefined || updated[k] === '') delete updated[k];
+    });
+    handleChange({ validation: updated });
   };
 
   const addOption = () => {
@@ -188,9 +200,104 @@ export const FieldPropertiesPanel = ({ field, onUpdate, onClose }: Props) => {
           </div>
         )}
 
+        {/* Validation */}
+        {(field.type === 'text' || field.type === 'number') && (
+          <div className="border-t border-slate-100 pt-4">
+            <div className="flex items-center gap-1.5 mb-3">
+              <ShieldCheck className="w-3.5 h-3.5 text-indigo-500" />
+              <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                Validation
+              </label>
+            </div>
+
+            {field.type === 'text' && (
+              <div className="space-y-3">
+                {/* Regex */}
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">
+                    Regex Pattern
+                  </label>
+                  <input
+                    type="text"
+                    value={validation.regex || ''}
+                    onChange={(e) => handleValidationChange({ regex: e.target.value || undefined })}
+                    placeholder="e.g. ^\d{13}$"
+                    className="w-full px-2.5 py-1.5 text-xs font-mono border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                  <p className="text-xs text-slate-400 mt-1">Leave empty to skip regex check</p>
+                </div>
+                {/* Min / Max Length */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Min Length</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={validation.minLength ?? ''}
+                      onChange={(e) => handleValidationChange({ minLength: e.target.value ? Number(e.target.value) : undefined })}
+                      placeholder="0"
+                      className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Max Length</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={validation.maxLength ?? ''}
+                      onChange={(e) => handleValidationChange({ maxLength: e.target.value ? Number(e.target.value) : undefined })}
+                      placeholder="∞"
+                      className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {field.type === 'number' && (
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Min Value</label>
+                  <input
+                    type="number"
+                    value={validation.min ?? ''}
+                    onChange={(e) => handleValidationChange({ min: e.target.value ? Number(e.target.value) : undefined })}
+                    placeholder="—"
+                    className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Max Value</label>
+                  <input
+                    type="number"
+                    value={validation.max ?? ''}
+                    onChange={(e) => handleValidationChange({ max: e.target.value ? Number(e.target.value) : undefined })}
+                    placeholder="—"
+                    className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Custom validation message — shown for both text and number */}
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">
+                Validation Message
+              </label>
+              <input
+                type="text"
+                value={validation.validationMessage || ''}
+                onChange={(e) => handleValidationChange({ validationMessage: e.target.value || undefined })}
+                placeholder="e.g. Please enter a valid CNIC (42101-1234567-1)"
+                className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+              <p className="text-xs text-slate-400 mt-1">Shown to user when input is invalid</p>
+            </div>
+          </div>
+        )}
+
         {/* Required toggle */}
-        <div className="flex items-center justify-between py-2 border-t border-slate-100">
-          <div>
+        <div className="flex items-center justify-between py-2 border-t border-slate-100">          <div>
             <p className="text-sm font-medium text-slate-700">Required</p>
             <p className="text-xs text-slate-400">Must be filled before submit</p>
           </div>

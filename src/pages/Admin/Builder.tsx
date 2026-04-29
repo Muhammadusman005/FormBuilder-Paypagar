@@ -88,14 +88,7 @@ export const Builder = () => {
     setFormData(prev => ({ ...prev, [fieldId]: value }));
   };
 
-  const handlePreviewSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    for (const field of fields) {
-      if (field.required && !formData[field.id]) {
-        alert(`"${field.label}" is required`);
-        return;
-      }
-    }
+  const handlePreviewSubmit = () => {
     alert('Form submitted successfully!');
     setFormData({});
   };

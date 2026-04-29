@@ -3,12 +3,46 @@ import { useParams, Link } from 'react-router-dom';
 import type { FormField } from '../../types/form';
 import { CheckCircle, ArrowLeft, Loader2 } from 'lucide-react';
 
+function validateField(field: FormField, value: string): string | null {
+  const v = field.validation;
+
+  if (field.required && !value.trim()) return `${field.label} is required`;
+  if (!value.trim()) return null;
+  if (!v) return null;
+
+  if (field.type === 'text') {
+    if (v.minLength !== undefined && value.length < v.minLength)
+      return v.validationMessage || `Minimum ${v.minLength} characters required`;
+    if (v.maxLength !== undefined && value.length > v.maxLength)
+      return v.validationMessage || `Maximum ${v.maxLength} characters allowed`;
+    if (v.regex) {
+      try {
+        if (!new RegExp(v.regex).test(value))
+          return v.validationMessage || `Invalid format`;
+      } catch {
+        // invalid regex — skip
+      }
+    }
+  }
+
+  if (field.type === 'number') {
+    const num = Number(value);
+    if (v.min !== undefined && num < v.min)
+      return v.validationMessage || `Minimum value is ${v.min}`;
+    if (v.max !== undefined && num > v.max)
+      return v.validationMessage || `Maximum value is ${v.max}`;
+  }
+
+  return null;
+}
+
 export const SubmitForm = () => {
   const { id } = useParams();
   const [fields, setFields] = useState<FormField[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitted, setSubmitted] = useState(false);
   const [formData, setFormData] = useState<Record<string, any>>({});
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [fileResetKey, setFileResetKey] = useState(0);
 
   useEffect(() => {
@@ -27,17 +61,30 @@ export const SubmitForm = () => {
 
   const handleInputChange = (fieldId: string, value: any) => {
     setFormData(prev => ({ ...prev, [fieldId]: value }));
+    const field = fields.find(f => f.id === fieldId);
+    if (field) {
+      const err = validateField(field, String(value ?? ''));
+      setFieldErrors(prev => ({ ...prev, [fieldId]: err ?? '' }));
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Validate required fields
+
+    // Run all validations before submit
+    const errors: Record<string, string> = {};
     for (const field of fields) {
       if (field.required && !formData[field.id]) {
-        alert(`${field.label} is required`);
-        return;
+        errors[field.id] = `${field.label} is required`;
+        continue;
       }
+      const err = validateField(field, String(formData[field.id] ?? ''));
+      if (err) errors[field.id] = err;
+    }
+
+    if (Object.values(errors).some(Boolean)) {
+      setFieldErrors(errors);
+      return;
     }
 
     console.log('Form submitted:', formData);
@@ -94,25 +141,39 @@ export const SubmitForm = () => {
                 </label>
 
                 {field.type === 'text' && (
-                  <input
-                    type="text"
-                    placeholder={field.placeholder}
-                    value={formData[field.id] || ''}
-                    onChange={(e) => handleInputChange(field.id, e.target.value)}
-                    required={field.required}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
+                  <div>
+                    <input
+                      type="text"
+                      placeholder={field.placeholder}
+                      value={formData[field.id] || ''}
+                      onChange={(e) => handleInputChange(field.id, e.target.value)}
+                      required={field.required}
+                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                        fieldErrors[field.id] ? 'border-red-400 focus:ring-red-400' : 'border-slate-300 focus:ring-indigo-500'
+                      }`}
+                    />
+                    {fieldErrors[field.id] && (
+                      <p className="mt-1 text-xs text-red-500">{fieldErrors[field.id]}</p>
+                    )}
+                  </div>
                 )}
 
                 {field.type === 'number' && (
-                  <input
-                    type="number"
-                    placeholder={field.placeholder}
-                    value={formData[field.id] || ''}
-                    onChange={(e) => handleInputChange(field.id, e.target.value)}
-                    required={field.required}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
+                  <div>
+                    <input
+                      type="number"
+                      placeholder={field.placeholder}
+                      value={formData[field.id] || ''}
+                      onChange={(e) => handleInputChange(field.id, e.target.value)}
+                      required={field.required}
+                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                        fieldErrors[field.id] ? 'border-red-400 focus:ring-red-400' : 'border-slate-300 focus:ring-indigo-500'
+                      }`}
+                    />
+                    {fieldErrors[field.id] && (
+                      <p className="mt-1 text-xs text-red-500">{fieldErrors[field.id]}</p>
+                    )}
+                  </div>
                 )}
 
                 {field.type === 'dropdown' && (

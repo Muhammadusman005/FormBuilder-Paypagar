@@ -10,6 +10,17 @@ interface Props {
   onSubmit: () => void;
 }
 
+// Parses "/pattern/flags" or "pattern" into a RegExp safely
+function parseRegex(raw: string): RegExp | null {
+  try {
+    const slashMatch = raw.match(/^\/(.+)\/([gimsuy]*)$/);
+    if (slashMatch) return new RegExp(slashMatch[1], slashMatch[2]);
+    return new RegExp(raw);
+  } catch {
+    return null;
+  }
+}
+
 function validateField(field: FormField, value: string): string | null {
   const v = field.validation;
 
@@ -28,12 +39,9 @@ function validateField(field: FormField, value: string): string | null {
     if (v.maxLength !== undefined && value.length > v.maxLength)
       return v.validationMessage || `Maximum ${v.maxLength} characters allowed`;
     if (v.regex) {
-      try {
-        if (!new RegExp(v.regex).test(value))
-          return v.validationMessage || `Invalid format`;
-      } catch {
-        // invalid regex — skip
-      }
+      const re = parseRegex(v.regex);
+      if (re && !re.test(value))
+        return v.validationMessage || `Invalid format`;
     }
   }
 

@@ -1,12 +1,18 @@
 export type FieldType = 'text' | 'number' | 'dropdown' | 'file';
 
 export interface FieldValidation {
-  regex?: string;        // custom regex pattern (text fields)
-  minLength?: number;    // min character length (text fields)
-  maxLength?: number;    // max character length (text fields)
-  min?: number;          // min value (number fields)
-  max?: number;          // max value (number fields)
-  validationMessage?: string; // custom message shown when validation fails
+  regex?: string;               // custom regex pattern (text fields)
+  regexMessage?: string;        // message shown when regex fails
+  minLength?: number;           // min character length (text fields)
+  minLengthMessage?: string;    // message shown when minLength fails
+  maxLength?: number;           // max character length (text fields)
+  maxLengthMessage?: string;    // message shown when maxLength fails
+  min?: number;                 // min value (number fields)
+  minMessage?: string;          // message shown when min fails
+  max?: number;                 // max value (number fields)
+  maxMessage?: string;          // message shown when max fails
+  /** @deprecated use regexMessage instead — kept for backward compatibility */
+  validationMessage?: string;
 }
 
 export interface FormField {

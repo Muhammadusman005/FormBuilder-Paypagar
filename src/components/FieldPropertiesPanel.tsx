@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { FormField, FieldValidation } from '../types/form';
 import { X, Plus, Trash2, ShieldCheck } from 'lucide-react';
+import { isValidRegex } from '../utils/validation';
 
 interface Props {
   field: FormField | null;
@@ -210,89 +211,142 @@ export const FieldPropertiesPanel = ({ field, onUpdate, onClose }: Props) => {
               </label>
             </div>
 
+            {/* ── Text validations ── */}
             {field.type === 'text' && (
-              <div className="space-y-3">
-                {/* Regex */}
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">
-                    Regex Pattern
-                  </label>
+              <div className="space-y-4">
+
+                {/* Min Length */}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-medium text-slate-600">Min Length</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={validation.minLength ?? ''}
+                    onChange={(e) => handleValidationChange({ minLength: e.target.value ? Number(e.target.value) : undefined })}
+                    placeholder="No minimum"
+                    className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                  {validation.minLength !== undefined && (
+                    <input
+                      type="text"
+                      value={validation.minLengthMessage || ''}
+                      onChange={(e) => handleValidationChange({ minLengthMessage: e.target.value || undefined })}
+                      placeholder={`e.g. Must be at least ${validation.minLength} characters`}
+                      className="w-full px-2.5 py-1.5 text-xs border border-slate-200 bg-slate-50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  )}
+                </div>
+
+                {/* Max Length */}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-medium text-slate-600">Max Length</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={validation.maxLength ?? ''}
+                    onChange={(e) => handleValidationChange({ maxLength: e.target.value ? Number(e.target.value) : undefined })}
+                    placeholder="No maximum"
+                    className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                  {validation.maxLength !== undefined && (
+                    <input
+                      type="text"
+                      value={validation.maxLengthMessage || ''}
+                      onChange={(e) => handleValidationChange({ maxLengthMessage: e.target.value || undefined })}
+                      placeholder={`e.g. Cannot exceed ${validation.maxLength} characters`}
+                      className="w-full px-2.5 py-1.5 text-xs border border-slate-200 bg-slate-50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  )}
+                </div>
+
+                {/* Regex Pattern */}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-medium text-slate-600">Regex Pattern</label>
                   <input
                     type="text"
                     value={validation.regex || ''}
                     onChange={(e) => handleValidationChange({ regex: e.target.value || undefined })}
-                    placeholder="e.g. ^\d{13}$"
-                    className="w-full px-2.5 py-1.5 text-xs font-mono border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    placeholder="e.g. /^[A-Z][a-zA-Z]*$/"
+                    className={`w-full px-2.5 py-1.5 text-xs font-mono border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+                      validation.regex
+                        ? isValidRegex(validation.regex)
+                          ? 'border-emerald-400 bg-emerald-50'
+                          : 'border-red-400 bg-red-50'
+                        : 'border-slate-300'
+                    }`}
                   />
-                  <p className="text-xs text-slate-400 mt-1">Leave empty to skip regex check</p>
-                </div>
-                {/* Min / Max Length */}
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-xs font-medium text-slate-600 mb-1">Min Length</label>
+                  {validation.regex && (
+                    isValidRegex(validation.regex)
+                      ? <p className="text-xs text-emerald-600">✓ Valid — strictly enforced</p>
+                      : <p className="text-xs text-red-500">✗ Invalid regex — users will be blocked</p>
+                  )}
+                  {!validation.regex && (
+                    <p className="text-xs text-slate-400">Supports /pattern/flags or plain pattern</p>
+                  )}
+                  {/* Regex error message — only shown when regex is set */}
+                  {validation.regex && isValidRegex(validation.regex) && (
                     <input
-                      type="number"
-                      min={0}
-                      value={validation.minLength ?? ''}
-                      onChange={(e) => handleValidationChange({ minLength: e.target.value ? Number(e.target.value) : undefined })}
-                      placeholder="0"
-                      className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      type="text"
+                      value={validation.regexMessage || ''}
+                      onChange={(e) => handleValidationChange({ regexMessage: e.target.value || undefined })}
+                      placeholder="e.g. Must start with a capital letter"
+                      className="w-full px-2.5 py-1.5 text-xs border border-slate-200 bg-slate-50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-600 mb-1">Max Length</label>
-                    <input
-                      type="number"
-                      min={0}
-                      value={validation.maxLength ?? ''}
-                      onChange={(e) => handleValidationChange({ maxLength: e.target.value ? Number(e.target.value) : undefined })}
-                      placeholder="∞"
-                      className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    />
-                  </div>
+                  )}
                 </div>
+
               </div>
             )}
 
+            {/* ── Number validations ── */}
             {field.type === 'number' && (
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Min Value</label>
+              <div className="space-y-4">
+
+                {/* Min Value */}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-medium text-slate-600">Min Value</label>
                   <input
                     type="number"
                     value={validation.min ?? ''}
                     onChange={(e) => handleValidationChange({ min: e.target.value ? Number(e.target.value) : undefined })}
-                    placeholder="—"
+                    placeholder="No minimum"
                     className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
+                  {validation.min !== undefined && (
+                    <input
+                      type="text"
+                      value={validation.minMessage || ''}
+                      onChange={(e) => handleValidationChange({ minMessage: e.target.value || undefined })}
+                      placeholder={`e.g. Value must be at least ${validation.min}`}
+                      className="w-full px-2.5 py-1.5 text-xs border border-slate-200 bg-slate-50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  )}
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Max Value</label>
+
+                {/* Max Value */}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-medium text-slate-600">Max Value</label>
                   <input
                     type="number"
                     value={validation.max ?? ''}
                     onChange={(e) => handleValidationChange({ max: e.target.value ? Number(e.target.value) : undefined })}
-                    placeholder="—"
+                    placeholder="No maximum"
                     className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
+                  {validation.max !== undefined && (
+                    <input
+                      type="text"
+                      value={validation.maxMessage || ''}
+                      onChange={(e) => handleValidationChange({ maxMessage: e.target.value || undefined })}
+                      placeholder={`e.g. Value cannot exceed ${validation.max}`}
+                      className="w-full px-2.5 py-1.5 text-xs border border-slate-200 bg-slate-50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  )}
                 </div>
+
               </div>
             )}
 
-            {/* Custom validation message — shown for both text and number */}
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">
-                Validation Message
-              </label>
-              <input
-                type="text"
-                value={validation.validationMessage || ''}
-                onChange={(e) => handleValidationChange({ validationMessage: e.target.value || undefined })}
-                placeholder="e.g. Please enter a valid CNIC (42101-1234567-1)"
-                className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-              <p className="text-xs text-slate-400 mt-1">Shown to user when input is invalid</p>
-            </div>
           </div>
         )}
 

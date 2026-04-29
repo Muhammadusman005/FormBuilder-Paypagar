@@ -89,7 +89,7 @@ export const FormFieldPreview = ({ field, isSelected, onDelete, onSelect, isDrag
         {field.type === 'file' && (
           <div className="h-7 bg-slate-50 border border-dashed border-slate-300 rounded px-2 flex items-center gap-1 overflow-hidden">
             <Upload className="w-3 h-3 text-slate-400 flex-shrink-0" />
-            <span className="text-xs text-slate-400 truncate">Upload file</span>
+            <span className="text-xs text-slate-400 truncate">{field.placeholder || 'Upload file'}</span>
           </div>
         )}
       </div>

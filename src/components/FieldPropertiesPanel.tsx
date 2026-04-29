@@ -106,7 +106,7 @@ export const FieldPropertiesPanel = ({ field, onUpdate, onClose }: Props) => {
         </div>
 
         {/* Placeholder */}
-        {field.type !== 'file' && (
+        {field.type !== 'dropdown' && (
           <div>
             <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
               Placeholder

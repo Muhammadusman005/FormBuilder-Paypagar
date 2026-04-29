@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { FormField } from '../types/form';
 import { Layers } from 'lucide-react';
+import { validateField } from '../utils/validation';
 
 interface Props {
   title: string;
@@ -8,52 +9,6 @@ interface Props {
   formData: Record<string, any>;
   onInputChange: (fieldId: string, value: any) => void;
   onSubmit: () => void;
-}
-
-// Parses "/pattern/flags" or "pattern" into a RegExp safely
-function parseRegex(raw: string): RegExp | null {
-  try {
-    const slashMatch = raw.match(/^\/(.+)\/([gimsuy]*)$/);
-    if (slashMatch) return new RegExp(slashMatch[1], slashMatch[2]);
-    return new RegExp(raw);
-  } catch {
-    return null;
-  }
-}
-
-function validateField(field: FormField, value: string): string | null {
-  const v = field.validation;
-
-  // Required check
-  if (field.required && !value.trim()) {
-    return `${field.label} is required`;
-  }
-
-  // Skip further validation if empty and not required
-  if (!value.trim()) return null;
-  if (!v) return null;
-
-  if (field.type === 'text') {
-    if (v.minLength !== undefined && value.length < v.minLength)
-      return v.validationMessage || `Minimum ${v.minLength} characters required`;
-    if (v.maxLength !== undefined && value.length > v.maxLength)
-      return v.validationMessage || `Maximum ${v.maxLength} characters allowed`;
-    if (v.regex) {
-      const re = parseRegex(v.regex);
-      if (re && !re.test(value))
-        return v.validationMessage || `Invalid format`;
-    }
-  }
-
-  if (field.type === 'number') {
-    const num = Number(value);
-    if (v.min !== undefined && num < v.min)
-      return v.validationMessage || `Minimum value is ${v.min}`;
-    if (v.max !== undefined && num > v.max)
-      return v.validationMessage || `Maximum value is ${v.max}`;
-  }
-
-  return null;
 }
 
 function FieldInput({
@@ -149,7 +104,6 @@ export const FormPreview = ({ title, fields, formData, onInputChange, onSubmit }
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validate all fields on submit
     const newErrors: Record<string, string | null> = {};
     let hasError = false;
 

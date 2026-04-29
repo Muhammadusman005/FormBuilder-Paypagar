@@ -39,6 +39,27 @@ const buildSchema = (title: string, fields: FormField[]) => ({
           base.choices = field.options;
         }
 
+        // Include validation only if any rule is configured
+        if (field.validation && Object.keys(field.validation).length > 0) {
+          const v = field.validation;
+          const validation: Record<string, any> = {};
+
+          if (v.regex)              validation.regex            = v.regex;
+          if (v.regexMessage)       validation.regexMessage     = v.regexMessage;
+          if (v.minLength !== undefined) validation.minLength   = v.minLength;
+          if (v.minLengthMessage)   validation.minLengthMessage = v.minLengthMessage;
+          if (v.maxLength !== undefined) validation.maxLength   = v.maxLength;
+          if (v.maxLengthMessage)   validation.maxLengthMessage = v.maxLengthMessage;
+          if (v.min !== undefined)  validation.min              = v.min;
+          if (v.minMessage)         validation.minMessage       = v.minMessage;
+          if (v.max !== undefined)  validation.max              = v.max;
+          if (v.maxMessage)         validation.maxMessage       = v.maxMessage;
+
+          if (Object.keys(validation).length > 0) {
+            base.validation = validation;
+          }
+        }
+
         return base;
       }),
     },

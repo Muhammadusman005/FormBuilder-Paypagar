@@ -106,19 +106,17 @@ export const FieldPropertiesPanel = ({ field, onUpdate, onClose }: Props) => {
         </div>
 
         {/* Placeholder */}
-        {field.type !== 'dropdown' && (
-          <div>
-            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
-              Placeholder
-            </label>
-            <input
-              type="text"
-              value={placeholder}
-              onChange={(e) => handleChange({ placeholder: e.target.value })}
-              className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
-        )}
+        <div>
+          <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
+            Placeholder
+          </label>
+          <input
+            type="text"
+            value={placeholder}
+            onChange={(e) => handleChange({ placeholder: e.target.value })}
+            className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+        </div>
 
         {/* Width */}
         <div>

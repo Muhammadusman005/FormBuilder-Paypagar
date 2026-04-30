@@ -1,75 +1,17 @@
 import { useState } from 'react';
 import type { FormField } from '../types/form';
 import { Copy, CheckCheck } from 'lucide-react';
+import { buildFormSchema } from '../utils/form';
 
 interface Props {
   title: string;
   fields: FormField[];
 }
 
-// Map our internal field types to the JSON schema types
-const toSchemaType = (type: FormField['type']): string => {
-  switch (type) {
-    case 'text':     return 'text';
-    case 'number':   return 'number';
-    case 'dropdown': return 'dropdown';
-    case 'file':     return 'file';
-    default:         return 'text';
-  }
-};
-
-const buildSchema = (title: string, fields: FormField[]) => ({
-  pages: [
-    {
-      name: 'page1',
-      title,
-      elements: fields.map((field, index) => {
-        const base: Record<string, any> = {
-          type: toSchemaType(field.type),
-          name: `question${index + 1}`,
-          title: field.label,
-          isRequired: field.required,
-        };
-
-        if (field.placeholder) {
-          base.placeholder = field.placeholder;
-        }
-
-        if (field.type === 'dropdown' && field.options?.length) {
-          base.choices = field.options;
-        }
-
-        // Include validation only if any rule is configured
-        if (field.validation && Object.keys(field.validation).length > 0) {
-          const v = field.validation;
-          const validation: Record<string, any> = {};
-
-          if (v.regex)              validation.regex            = v.regex;
-          if (v.regexMessage)       validation.regexMessage     = v.regexMessage;
-          if (v.minLength !== undefined) validation.minLength   = v.minLength;
-          if (v.minLengthMessage)   validation.minLengthMessage = v.minLengthMessage;
-          if (v.maxLength !== undefined) validation.maxLength   = v.maxLength;
-          if (v.maxLengthMessage)   validation.maxLengthMessage = v.maxLengthMessage;
-          if (v.min !== undefined)  validation.min              = v.min;
-          if (v.minMessage)         validation.minMessage       = v.minMessage;
-          if (v.max !== undefined)  validation.max              = v.max;
-          if (v.maxMessage)         validation.maxMessage       = v.maxMessage;
-
-          if (Object.keys(validation).length > 0) {
-            base.validation = validation;
-          }
-        }
-
-        return base;
-      }),
-    },
-  ],
-});
-
 export const FormJsonView = ({ title, fields }: Props) => {
   const [copied, setCopied] = useState(false);
 
-  const schema = buildSchema(title, fields);
+  const schema = buildFormSchema(title, fields);
   const jsonString = JSON.stringify(schema, null, 2);
 
   const handleCopy = () => {

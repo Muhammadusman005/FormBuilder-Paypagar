@@ -1,5 +1,6 @@
 import type { FormField } from '../types/form';
-import { GripVertical, Pencil, Trash2, Type, Hash, ChevronDown, Upload } from 'lucide-react';
+import { GripVertical, Pencil, Trash2, ChevronDown, Upload } from 'lucide-react';
+import { FIELD_TYPE_META } from '../constants';
 
 interface Props {
   field: FormField;
@@ -9,15 +10,8 @@ interface Props {
   isDragging?: boolean;
 }
 
-const TYPE_META: Record<string, { label: string; icon: React.ElementType; color: string }> = {
-  text:     { label: 'Text',     icon: Type,        color: 'bg-blue-50 text-blue-600 border-blue-200' },
-  number:   { label: 'Number',   icon: Hash,        color: 'bg-purple-50 text-purple-600 border-purple-200' },
-  dropdown: { label: 'Dropdown', icon: ChevronDown, color: 'bg-amber-50 text-amber-600 border-amber-200' },
-  file:     { label: 'File',     icon: Upload,      color: 'bg-green-50 text-green-600 border-green-200' },
-};
-
 export const FormFieldPreview = ({ field, isSelected, onDelete, onSelect, isDragging }: Props) => {
-  const meta = TYPE_META[field.type];
+  const meta = FIELD_TYPE_META[field.type];
   const Icon = meta.icon;
 
   return (

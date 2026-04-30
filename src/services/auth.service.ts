@@ -1,5 +1,6 @@
 import api from './axios';
 import { ENDPOINTS } from './endpoints';
+import { AUTH_TOKEN_KEY as TOKEN_KEY, AUTH_USER_KEY as USER_KEY } from '../constants';
 
 export interface LoginPayload {
   email: string;
@@ -24,9 +25,6 @@ interface LoginResponse {
   data: AuthUser;
   statusCode: number;
 }
-
-const TOKEN_KEY = 'auth_token';
-const USER_KEY  = 'auth_user';
 
 export const AuthService = {
   login: async (payload: LoginPayload): Promise<AuthUser> => {

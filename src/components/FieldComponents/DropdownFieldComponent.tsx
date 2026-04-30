@@ -1,12 +1,13 @@
 import type { FormField } from '../../types/form';
 import { ChevronDown } from 'lucide-react';
+import { generateId } from '../../utils/form';
 
 export const DropdownFieldComponent = {
   icon: ChevronDown,
   label: 'Dropdown',
   type: 'dropdown' as const,
   create: (): FormField => ({
-    id: Date.now().toString(),
+    id: generateId(),
     type: 'dropdown',
     label: 'Dropdown Field',
     required: false,

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { FormField } from '../types/form';
 import { FormFieldPreview } from './FormFieldPreview';
 import { Layers } from 'lucide-react';
+import { GRID_COLUMNS } from '../constants';
 
 interface Props {
   title: string;
@@ -80,7 +81,7 @@ export const FormCanvas = ({
               </div>
             ) : (
               /* 4-column grid using inline styles to avoid Tailwind purging */
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: `repeat(${GRID_COLUMNS}, 1fr)`, gap: '12px' }}>
                 {fields.map((field) => (
                   <div
                     key={field.id}
@@ -88,7 +89,7 @@ export const FormCanvas = ({
                     onDragStart={() => onFieldDragStart(field.id)}
                     onDragOver={(e) => e.preventDefault()}
                     onDrop={() => onFieldDrop(field.id)}
-                    style={{ gridColumn: `span ${field.colSpan ?? 4}` }}
+                    style={{ gridColumn: `span ${field.colSpan ?? GRID_COLUMNS}` }}
                   >
                     <FormFieldPreview
                       field={field}
@@ -102,7 +103,7 @@ export const FormCanvas = ({
 
                 {isDragOver && (
                   <div
-                    style={{ gridColumn: 'span 4' }}
+                    style={{ gridColumn: `span ${GRID_COLUMNS}` }}
                     className="h-12 border-2 border-dashed border-indigo-300 rounded-lg bg-indigo-50 flex items-center justify-center"
                   >
                     <p className="text-xs text-indigo-500 font-medium">Drop here</p>

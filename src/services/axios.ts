@@ -1,5 +1,6 @@
 import axios from 'axios';
 import type { AxiosRequestConfig } from 'axios';
+import { AUTH_TOKEN_KEY, AUTH_USER_KEY } from '../constants';
 
 // Always use the dev URL in development, production URL in production
 const baseURL = import.meta.env.VITE_API_BASE_URL;
@@ -15,7 +16,7 @@ const api = axios.create({
 // ── Request interceptor — attach Bearer token ─────────────────
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('auth_token');
+    const token = localStorage.getItem(AUTH_TOKEN_KEY);
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -36,8 +37,8 @@ api.interceptors.response.use(
 
     // Auto-logout on expired / invalid token
     if (error.response?.status === 401) {
-      localStorage.removeItem('auth_token');
-      localStorage.removeItem('auth_user');
+      localStorage.removeItem(AUTH_TOKEN_KEY);
+      localStorage.removeItem(AUTH_USER_KEY);
       window.location.href = '/login';
     }
 

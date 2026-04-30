@@ -1,20 +1,14 @@
 import { useEffect, useState } from 'react';
 import type { FormField, FieldValidation } from '../types/form';
 import { X, Plus, Trash2, ShieldCheck } from 'lucide-react';
-import { isValidRegex } from '../utils/validation';
+import { isValidRegex } from '../utils/form';
+import { COL_SPAN_OPTIONS } from '../constants';
 
 interface Props {
   field: FormField | null;
   onUpdate: (field: FormField) => void;
   onClose: () => void;
 }
-
-const COL_OPTIONS: { value: 1 | 2 | 3 | 4; label: string; desc: string }[] = [
-  { value: 1, label: '1/4', desc: 'Quarter' },
-  { value: 2, label: '1/2', desc: 'Half' },
-  { value: 3, label: '3/4', desc: 'Three quarters' },
-  { value: 4, label: 'Full', desc: 'Full width' },
-];
 
 export const FieldPropertiesPanel = ({ field, onUpdate, onClose }: Props) => {
   const [label, setLabel] = useState('');
@@ -148,7 +142,7 @@ export const FieldPropertiesPanel = ({ field, onUpdate, onClose }: Props) => {
             ))}
           </div>
           <div className="grid grid-cols-4 gap-1">
-            {COL_OPTIONS.map((opt) => (
+            {COL_SPAN_OPTIONS.map((opt) => (
               <button
                 key={opt.value}
                 onClick={() => handleChange({ colSpan: opt.value })}
@@ -164,7 +158,7 @@ export const FieldPropertiesPanel = ({ field, onUpdate, onClose }: Props) => {
             ))}
           </div>
           <p className="text-xs text-slate-400 mt-1.5">
-            {COL_OPTIONS.find(o => o.value === colSpan)?.desc} — {colSpan} of 4 columns
+            {COL_SPAN_OPTIONS.find(o => o.value === colSpan)?.desc} — {colSpan} of 4 columns
           </p>
         </div>
 

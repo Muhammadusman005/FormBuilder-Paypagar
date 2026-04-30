@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { FormField, FieldType } from '../types/form';
 import { X } from 'lucide-react';
+import { generateId } from '../utils/form';
 
 interface Props {
   field?: FormField;
@@ -15,16 +16,19 @@ export const FieldEditorModal = ({ field, onSave, onClose }: Props) => {
   const [placeholder, setPlaceholder] = useState(field?.placeholder || '');
   const [options, setOptions] = useState((field?.options || []).join('\n'));
 
+  const [labelError, setLabelError] = useState('');
+
   const handleSave = () => {
     if (!label.trim()) {
-      alert('Label is required');
+      setLabelError('Label is required');
       return;
     }
+    setLabelError('');
 
     onSave({
-      id: field?.id || Date.now().toString(),
+      id: field?.id || generateId(),
       type,
-      label,
+      label: label.trim(),
       required,
       placeholder,
       options: type === 'dropdown' ? options.split('\n').filter(o => o.trim()) : undefined,
@@ -68,10 +72,13 @@ export const FieldEditorModal = ({ field, onSave, onClose }: Props) => {
             <input
               type="text"
               value={label}
-              onChange={(e) => setLabel(e.target.value)}
+              onChange={(e) => { setLabel(e.target.value); if (labelError) setLabelError(''); }}
               placeholder="e.g., First Name"
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+                labelError ? 'border-red-400' : 'border-slate-300'
+              }`}
             />
+            {labelError && <p className="mt-1 text-xs text-red-500">{labelError}</p>}
           </div>
 
           {/* Placeholder */}

@@ -26,14 +26,24 @@ export interface FormField {
   validation?: FieldValidation;
 }
 
-export interface FormSchema {
+export interface SubForm {
   id: string;
-  title: string;
+  name: string;
+  category?: string; // e.g., "personal_info", "business_info", "kyc", "documents"
   fields: FormField[];
-  status: 'draft' | 'published';
 }
 
 export interface FormSchema {
+  id: string;
+  name: string;
+  sub_forms: SubForm[];
+  status: 'draft' | 'published';
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Legacy support
+export interface LegacyFormSchema {
   id: string;
   title: string;
   fields: FormField[];

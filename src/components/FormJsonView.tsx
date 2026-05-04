@@ -1,18 +1,15 @@
 import { useState } from 'react';
-import type { FormField } from '../types/form';
+import type { FormSchema } from '../types/form';
 import { Copy, CheckCheck } from 'lucide-react';
-import { buildFormSchema } from '../utils/form';
 
 interface Props {
-  title: string;
-  fields: FormField[];
+  form: FormSchema;
 }
 
-export const FormJsonView = ({ title, fields }: Props) => {
+export const FormJsonView = ({ form }: Props) => {
   const [copied, setCopied] = useState(false);
 
-  const schema = buildFormSchema(title, fields);
-  const jsonString = JSON.stringify(schema, null, 2);
+  const jsonString = JSON.stringify(form, null, 2);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(jsonString);
@@ -22,14 +19,14 @@ export const FormJsonView = ({ title, fields }: Props) => {
 
   return (
     <div className="flex-1 overflow-y-auto p-6 bg-slate-100">
-      <div className="max-w-3xl mx-auto">
+      <div className="max-w-4xl mx-auto">
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
           {/* Header */}
           <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-200 bg-slate-50">
             <div>
               <h3 className="text-sm font-semibold text-slate-800">Form JSON Schema</h3>
               <p className="text-xs text-slate-400 mt-0.5">
-                {fields.length} field{fields.length !== 1 ? 's' : ''} · live preview
+                Complete form data with all sub-forms and fields
               </p>
             </div>
             <button
@@ -48,16 +45,9 @@ export const FormJsonView = ({ title, fields }: Props) => {
           </div>
 
           {/* JSON output */}
-          {fields.length === 0 ? (
-            <div className="p-10 text-center text-slate-400">
-              <p className="text-sm">No fields added yet.</p>
-              <p className="text-xs mt-1">Add fields in the Designer tab to see the JSON schema.</p>
-            </div>
-          ) : (
-            <pre className="p-5 text-xs leading-relaxed text-slate-700 overflow-x-auto font-mono bg-[#fafafa]">
-              {jsonString}
-            </pre>
-          )}
+          <pre className="p-5 text-xs leading-relaxed text-slate-700 overflow-x-auto font-mono bg-[#fafafa]">
+            {jsonString}
+          </pre>
         </div>
       </div>
     </div>

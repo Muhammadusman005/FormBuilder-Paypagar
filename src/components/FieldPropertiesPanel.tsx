@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import type { FormField, FieldValidation } from '../types/form';
-import { X, Plus, Trash2, ShieldCheck } from 'lucide-react';
-import { isValidRegex } from '../utils/form';
-import { COL_SPAN_OPTIONS } from '../constants';
+import { X, Plus, Trash2, ShieldCheck, Zap } from 'lucide-react';
+import { isValidRegexPattern } from '../utils/validation-engine';
+import { COL_SPAN_OPTIONS, REGEX_PATTERNS } from '../constants';
 
 interface Props {
   field: FormField | null;
@@ -209,6 +209,37 @@ export const FieldPropertiesPanel = ({ field, onUpdate, onClose }: Props) => {
             {field.type === 'text' && (
               <div className="space-y-4">
 
+                {/* Predefined Patterns */}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-medium text-slate-600 flex items-center gap-1.5">
+                    <Zap className="w-3 h-3 text-amber-500" />
+                    Quick Patterns
+                  </label>
+                  <select
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        const pattern = REGEX_PATTERNS.find(p => p.id === e.target.value);
+                        if (pattern) {
+                          handleValidationChange({ 
+                            regex: pattern.pattern,
+                            regexMessage: `Must match ${pattern.label.toLowerCase()}`
+                          });
+                          e.target.value = '';
+                        }
+                      }
+                    }}
+                    className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                  >
+                    <option value="">Select a pattern...</option>
+                    {REGEX_PATTERNS.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.label} — {p.example}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-slate-400">Click to auto-fill regex pattern</p>
+                </div>
+
                 {/* Min Length */}
                 <div className="space-y-1.5">
                   <label className="block text-xs font-medium text-slate-600">Min Length</label>
@@ -263,14 +294,14 @@ export const FieldPropertiesPanel = ({ field, onUpdate, onClose }: Props) => {
                     placeholder="e.g. /^[A-Z][a-zA-Z]*$/"
                     className={`w-full px-2.5 py-1.5 text-xs font-mono border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
                       validation.regex
-                        ? isValidRegex(validation.regex)
+                        ? isValidRegexPattern(validation.regex)
                           ? 'border-emerald-400 bg-emerald-50'
                           : 'border-red-400 bg-red-50'
                         : 'border-slate-300'
                     }`}
                   />
                   {validation.regex && (
-                    isValidRegex(validation.regex)
+                    isValidRegexPattern(validation.regex)
                       ? <p className="text-xs text-emerald-600">✓ Valid — strictly enforced</p>
                       : <p className="text-xs text-red-500">✗ Invalid regex — users will be blocked</p>
                   )}
@@ -278,7 +309,7 @@ export const FieldPropertiesPanel = ({ field, onUpdate, onClose }: Props) => {
                     <p className="text-xs text-slate-400">Supports /pattern/flags or plain pattern</p>
                   )}
                   {/* Regex error message — only shown when regex is set */}
-                  {validation.regex && isValidRegex(validation.regex) && (
+                  {validation.regex && isValidRegexPattern(validation.regex) && (
                     <input
                       type="text"
                       value={validation.regexMessage || ''}

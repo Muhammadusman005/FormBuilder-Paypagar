@@ -5,7 +5,7 @@ import { Zap, Loader2, Eye, EyeOff } from 'lucide-react';
 
 export const Login = () => {
   const navigate = useNavigate();
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState('admin@souqaltijarah.com');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);

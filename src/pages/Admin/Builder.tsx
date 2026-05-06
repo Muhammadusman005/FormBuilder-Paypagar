@@ -151,6 +151,12 @@ export const Builder = () => {
     const component = FIELD_COMPONENTS.find(c => c.type === draggedComponentType);
     if (component) {
       const newField = component.create();
+
+      // Assign a unique row — always a new row below all existing fields
+      const maxRow = fields.reduce((max, f) => Math.max(max, f.row ?? 0), -1);
+      newField.row = maxRow + 1;
+      newField.colSpan = 4; // default full width
+
       const updatedFields = [...fields, newField];
       setFields(updatedFields);
       setSelectedField(newField);
@@ -167,23 +173,17 @@ export const Builder = () => {
     setDraggedComponentType(null);
   };
 
-  // ── Field reorder drag ────────────────────────────────────────
+  // ── Field reorder / row merge drag ───────────────────────────
   const handleFieldDragStart = (id: string) => {
     setDraggedId(id);
     setDraggedComponentType(null);
   };
 
-  const handleFieldDrop = (targetId: string) => {
-    if (!draggedId || draggedId === targetId) return;
-
-    const updatedFields = [...fields];
-    const from = updatedFields.findIndex(f => f.id === draggedId);
-    const to = updatedFields.findIndex(f => f.id === targetId);
-    const [moved] = updatedFields.splice(from, 1);
-    updatedFields.splice(to, 0, moved);
+  const handleFieldsUpdate = (updatedFields: FormField[]) => {
     setFields(updatedFields);
+    setDraggedId(null);
 
-    // Update form
+    // Sync to form state
     if (currentSubForm) {
       const updatedSubForms = form.sub_forms.map(sf =>
         sf.id === selectedSubFormId ? { ...sf, fields: updatedFields } : sf
@@ -191,8 +191,6 @@ export const Builder = () => {
       const updatedForm = { ...form, sub_forms: updatedSubForms };
       setForm(updatedForm);
     }
-
-    setDraggedId(null);
   };
 
   // ── Field CRUD ────────────────────────────────────────────────
@@ -388,7 +386,7 @@ export const Builder = () => {
               selectedFieldId={selectedField?.id ?? null}
               draggedId={draggedId}
               onFieldDragStart={handleFieldDragStart}
-              onFieldDrop={handleFieldDrop}
+              onFieldsUpdate={handleFieldsUpdate}
               onDelete={handleDeleteField}
               onSelect={handleSelectField}
               onCanvasDrop={handleCanvasDrop}
@@ -399,6 +397,7 @@ export const Builder = () => {
               field={selectedField}
               onUpdate={handleUpdateField}
               onClose={() => setSelectedField(null)}
+              allFields={fields}
             />
           </>
         ) : activeTab === 'preview' ? (

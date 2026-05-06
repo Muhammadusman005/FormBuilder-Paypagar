@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { FormField, FieldValidation } from '../types/form';
-import { X, Plus, Trash2, ShieldCheck, Zap } from 'lucide-react';
+import { X, Plus, Trash2, ShieldCheck, Zap, Rows3 } from 'lucide-react';
 import { isValidRegexPattern } from '../utils/validation-engine';
 import { COL_SPAN_OPTIONS, REGEX_PATTERNS } from '../constants';
 
@@ -8,14 +8,16 @@ interface Props {
   field: FormField | null;
   onUpdate: (field: FormField) => void;
   onClose: () => void;
+  allFields?: FormField[]; // to show available rows
 }
 
-export const FieldPropertiesPanel = ({ field, onUpdate, onClose }: Props) => {
+export const FieldPropertiesPanel = ({ field, onUpdate, onClose, allFields = [] }: Props) => {
   const [label, setLabel] = useState('');
   const [placeholder, setPlaceholder] = useState('');
   const [required, setRequired] = useState(false);
   const [options, setOptions] = useState<string[]>([]);
   const [colSpan, setColSpan] = useState<1 | 2 | 3 | 4>(4);
+  const [row, setRow] = useState<number>(0);
   const [validation, setValidation] = useState<FieldValidation>({});
 
   useEffect(() => {
@@ -25,6 +27,7 @@ export const FieldPropertiesPanel = ({ field, onUpdate, onClose }: Props) => {
       setRequired(field.required);
       setOptions(field.options || []);
       setColSpan(field.colSpan ?? 4);
+      setRow(field.row ?? 0);
       setValidation(field.validation || {});
     }
   }, [field?.id]);
@@ -40,13 +43,14 @@ export const FieldPropertiesPanel = ({ field, onUpdate, onClose }: Props) => {
   }
 
   const handleChange = (updates: Partial<FormField>) => {
-    const updated = { ...field, label, placeholder, required, options, colSpan, validation, ...updates };
+    const updated = { ...field, label, placeholder, required, options, colSpan, row, validation, ...updates };
     onUpdate(updated);
     if ('label' in updates) setLabel(updates.label!);
     if ('placeholder' in updates) setPlaceholder(updates.placeholder!);
     if ('required' in updates) setRequired(updates.required!);
     if ('options' in updates) setOptions(updates.options!);
     if ('colSpan' in updates) setColSpan(updates.colSpan!);
+    if ('row' in updates) setRow(updates.row!);
     if ('validation' in updates) setValidation(updates.validation!);
   };
 
@@ -159,6 +163,56 @@ export const FieldPropertiesPanel = ({ field, onUpdate, onClose }: Props) => {
           </div>
           <p className="text-xs text-slate-400 mt-1.5">
             {COL_SPAN_OPTIONS.find(o => o.value === colSpan)?.desc} — {colSpan} of 4 columns
+          </p>
+        </div>
+
+        {/* Row grouping */}
+        <div>
+          <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+            <div className="flex items-center gap-1.5">
+              <Rows3 className="w-3.5 h-3.5" />
+              Row
+            </div>
+          </label>
+          <div className="space-y-2">
+            {/* Current row — own row */}
+            <button
+              onClick={() => {
+                // Move to its own unique row (max + 1)
+                const maxRow = allFields.reduce((max, f) => Math.max(max, f.row ?? 0), -1);
+                handleChange({ row: maxRow + 1 });
+              }}
+              className={`w-full text-left px-3 py-2 text-xs rounded-lg border transition-all ${
+                !allFields.some(f => f.id !== field.id && f.row === row)
+                  ? 'bg-indigo-50 border-indigo-300 text-indigo-700 font-medium'
+                  : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300'
+              }`}
+            >
+              Own row (full width)
+            </button>
+
+            {/* Existing rows that have other fields */}
+            {Array.from(new Set(allFields.filter(f => f.id !== field.id).map(f => f.row ?? 0))).map((rowNum) => {
+              const rowFields = allFields.filter(f => f.id !== field.id && (f.row ?? 0) === rowNum);
+              const isCurrentRow = row === rowNum;
+              return (
+                <button
+                  key={rowNum}
+                  onClick={() => handleChange({ row: rowNum })}
+                  className={`w-full text-left px-3 py-2 text-xs rounded-lg border transition-all ${
+                    isCurrentRow
+                      ? 'bg-indigo-50 border-indigo-300 text-indigo-700 font-medium'
+                      : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300'
+                  }`}
+                >
+                  <span className="font-medium">Same row as:</span>{' '}
+                  {rowFields.map(f => f.label).join(', ')}
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-xs text-slate-400 mt-1.5">
+            Place in same row to display side by side
           </p>
         </div>
 

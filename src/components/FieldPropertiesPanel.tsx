@@ -1,17 +1,97 @@
 import { useEffect, useState } from 'react';
 import type { FormField, FieldValidation } from '../types/form';
-import { X, Plus, Trash2, ShieldCheck, Zap, Rows3 } from 'lucide-react';
+import { X, Plus, Trash2, ShieldCheck, Zap, LayoutGrid, ChevronDown, ChevronRight } from 'lucide-react';
 import { isValidRegexPattern } from '../utils/validation-engine';
-import { COL_SPAN_OPTIONS, REGEX_PATTERNS } from '../constants';
+import { COL_SPAN_OPTIONS, REGEX_PATTERNS, FIELD_TYPE_META } from '../constants';
 
 interface Props {
   field: FormField | null;
   onUpdate: (field: FormField) => void;
+  onUpdateMultiple?: (fields: FormField[]) => void;
   onClose: () => void;
-  allFields?: FormField[]; // to show available rows
+  allFields?: FormField[];
 }
 
-export const FieldPropertiesPanel = ({ field, onUpdate, onClose, allFields = [] }: Props) => {
+// Collapsible section wrapper
+const Section = ({
+  title,
+  icon,
+  children,
+  defaultOpen = true,
+  badge,
+}: {
+  title: string;
+  icon?: React.ReactNode;
+  children: React.ReactNode;
+  defaultOpen?: boolean;
+  badge?: string;
+}) => {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="border-b border-slate-100 last:border-0">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-slate-50 transition-colors group"
+      >
+        <div className="flex items-center gap-1.5">
+          {icon && <span className="text-slate-400 group-hover:text-slate-600 transition-colors">{icon}</span>}
+          <span className="text-xs font-semibold text-slate-600 uppercase tracking-wide">{title}</span>
+          {badge && (
+            <span className="px-1.5 py-0.5 bg-indigo-100 text-indigo-600 text-[10px] font-semibold rounded-full">
+              {badge}
+            </span>
+          )}
+        </div>
+        {open
+          ? <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+          : <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+        }
+      </button>
+      {open && <div className="px-4 pb-4 space-y-3">{children}</div>}
+    </div>
+  );
+};
+
+// Layout preset button
+const PresetBtn = ({
+  label,
+  bars,
+  onClick,
+  disabled,
+}: {
+  label: string;
+  bars: number[];
+  onClick: () => void;
+  disabled?: boolean;
+}) => (
+  <button
+    onClick={onClick}
+    disabled={disabled}
+    title={disabled ? 'Need ≥2 fields in this row' : label}
+    className={`w-full flex items-center gap-2 px-2.5 py-1.5 text-xs rounded-lg border transition-all group ${
+      disabled
+        ? 'opacity-40 cursor-not-allowed border-slate-100 bg-slate-50'
+        : 'border-slate-200 bg-white hover:border-indigo-300 hover:bg-indigo-50 active:scale-95'
+    }`}
+  >
+    <div className="flex gap-0.5 flex-1 h-3">
+      {bars.map((flex, i) => (
+        <div
+          key={i}
+          className={`rounded-sm transition-colors ${
+            disabled ? 'bg-slate-200' : i === 0 ? 'bg-indigo-500 group-hover:bg-indigo-600' : 'bg-indigo-200 group-hover:bg-indigo-300'
+          }`}
+          style={{ flex }}
+        />
+      ))}
+    </div>
+    <span className={`whitespace-nowrap font-medium ${disabled ? 'text-slate-400' : 'text-slate-600 group-hover:text-indigo-700'}`}>
+      {label}
+    </span>
+  </button>
+);
+
+export const FieldPropertiesPanel = ({ field, onUpdate, onUpdateMultiple, onClose, allFields = [] }: Props) => {
   const [label, setLabel] = useState('');
   const [placeholder, setPlaceholder] = useState('');
   const [required, setRequired] = useState(false);
@@ -32,15 +112,23 @@ export const FieldPropertiesPanel = ({ field, onUpdate, onClose, allFields = [] 
     }
   }, [field?.id]);
 
+  // ── Empty state ────────────────────────────────────────────────
   if (!field) {
     return (
-      <div className="w-64 bg-white border-l border-slate-200 flex items-center justify-center flex-shrink-0">
-        <p className="text-xs text-slate-400 text-center px-4">
-          Click a field on the canvas to edit its properties
+      <div className="w-64 bg-white border-l border-slate-100 flex flex-col items-center justify-center flex-shrink-0 gap-3">
+        <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center">
+          <LayoutGrid className="w-5 h-5 text-slate-400" />
+        </div>
+        <p className="text-xs text-slate-400 text-center px-6 leading-relaxed">
+          Click any field on the canvas to edit its properties
         </p>
       </div>
     );
   }
+
+  const meta = FIELD_TYPE_META[field.type];
+  const rowFields = allFields.filter(f => (f.row ?? 0) === row);
+  const hasMultipleInRow = rowFields.length >= 2;
 
   const handleChange = (updates: Partial<FormField>) => {
     const updated = { ...field, label, placeholder, required, options, colSpan, row, validation, ...updates };
@@ -56,397 +144,360 @@ export const FieldPropertiesPanel = ({ field, onUpdate, onClose, allFields = [] 
 
   const handleValidationChange = (patch: Partial<FieldValidation>) => {
     const updated = { ...validation, ...patch };
-    // Remove undefined keys to keep it clean
     (Object.keys(updated) as (keyof FieldValidation)[]).forEach((k) => {
       if (updated[k] === undefined || updated[k] === '') delete updated[k];
     });
     handleChange({ validation: updated });
   };
 
-  const addOption = () => {
-    const newOptions = [...options, `Option ${options.length + 1}`];
-    handleChange({ options: newOptions });
+  const applyPreset = (spans: number[]) => {
+    if (!onUpdateMultiple) return;
+    const sorted = [...rowFields].sort(
+      (a, b) => allFields.findIndex(x => x.id === a.id) - allFields.findIndex(x => x.id === b.id)
+    );
+    const updated = sorted.map((f, i) => ({
+      ...f,
+      colSpan: (spans[i] ?? spans[spans.length - 1]) as 1 | 2 | 3 | 4,
+    }));
+    onUpdateMultiple(updated);
   };
 
-  const updateOption = (index: number, value: string) => {
-    const newOptions = options.map((o, i) => (i === index ? value : o));
-    handleChange({ options: newOptions });
-  };
+  const addOption = () => handleChange({ options: [...options, `Option ${options.length + 1}`] });
+  const updateOption = (i: number, v: string) => handleChange({ options: options.map((o, j) => j === i ? v : o) });
+  const removeOption = (i: number) => handleChange({ options: options.filter((_, j) => j !== i) });
 
-  const removeOption = (index: number) => {
-    const newOptions = options.filter((_, i) => i !== index);
-    handleChange({ options: newOptions });
-  };
+  const hasValidation = Object.keys(validation).length > 0;
 
   return (
-    <div className="w-64 bg-white border-l border-slate-200 flex flex-col flex-shrink-0 overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 flex-shrink-0">
-        <h3 className="text-sm font-semibold text-slate-800">Properties</h3>
+    <div className="w-64 bg-white border-l border-slate-100 flex flex-col flex-shrink-0 overflow-hidden shadow-sm">
+
+      {/* ── Header ── */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 flex-shrink-0 bg-slate-50/50">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className={`flex items-center justify-center w-6 h-6 rounded-md border flex-shrink-0 ${meta.color}`}>
+            <meta.icon className="w-3 h-3" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-slate-800 truncate">{label || 'Untitled'}</p>
+            <p className="text-[10px] text-slate-400 capitalize">{meta.label} field</p>
+          </div>
+        </div>
         <button
           onClick={onClose}
-          className="p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+          className="p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors flex-shrink-0"
         >
-          <X className="w-4 h-4" />
+          <X className="w-3.5 h-3.5" />
         </button>
       </div>
 
-      {/* Fields */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-5">
-        {/* Type (read-only badge) */}
-        <div>
-          <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
-            Field Type
-          </label>
-          <span className="inline-block px-2.5 py-1 bg-indigo-50 text-indigo-700 text-xs font-medium rounded-md border border-indigo-200 capitalize">
-            {field.type}
-          </span>
-        </div>
+      {/* ── Scrollable body ── */}
+      <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
 
-        {/* Label */}
-        <div>
-          <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
-            Label
-          </label>
-          <input
-            type="text"
-            value={label}
-            onChange={(e) => handleChange({ label: e.target.value })}
-            className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 overflow-hidden text-ellipsis"
-          />
-        </div>
+        {/* ── Basic ── */}
+        <Section title="Basic">
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1">Label</label>
+            <input
+              type="text"
+              value={label}
+              onChange={(e) => handleChange({ label: e.target.value })}
+              className="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              placeholder="Field label"
+            />
+          </div>
 
-        {/* Placeholder */}
-        <div>
-          <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
-            Placeholder
-          </label>
-          <input
-            type="text"
-            value={placeholder}
-            onChange={(e) => handleChange({ placeholder: e.target.value })}
-            className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
-        </div>
+          {field.type !== 'file' && field.type !== 'radio' && field.type !== 'checkbox' && (
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">Placeholder</label>
+              <input
+                type="text"
+                value={placeholder}
+                onChange={(e) => handleChange({ placeholder: e.target.value })}
+                className="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                placeholder="Hint text..."
+              />
+            </div>
+          )}
 
-        {/* Width */}
-        <div>
-          <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
-            Width
-          </label>
-          {/* Visual grid preview */}
-          <div className="grid grid-cols-4 gap-1 mb-2">
+          {/* Required toggle */}
+          <div className="flex items-center justify-between py-0.5">
+            <div>
+              <p className="text-xs font-medium text-slate-700">Required</p>
+              <p className="text-[10px] text-slate-400">Must be filled before submit</p>
+            </div>
+            <button
+              onClick={() => handleChange({ required: !required })}
+              className={`relative w-9 h-5 rounded-full transition-colors flex-shrink-0 ${required ? 'bg-indigo-600' : 'bg-slate-200'}`}
+            >
+              <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${required ? 'translate-x-4' : 'translate-x-0'}`} />
+            </button>
+          </div>
+        </Section>
+
+        {/* ── Width ── */}
+        <Section title="Width">
+          {/* Visual bar */}
+          <div className="grid grid-cols-4 gap-1">
             {[1, 2, 3, 4].map((col) => (
               <div
                 key={col}
-                className={`h-2 rounded-sm transition-colors ${
-                  col <= colSpan ? 'bg-indigo-500' : 'bg-slate-200'
-                }`}
+                className={`h-1.5 rounded-full transition-colors ${col <= colSpan ? 'bg-indigo-500' : 'bg-slate-200'}`}
               />
             ))}
           </div>
+          {/* Buttons */}
           <div className="grid grid-cols-4 gap-1">
             {COL_SPAN_OPTIONS.map((opt) => (
               <button
                 key={opt.value}
                 onClick={() => handleChange({ colSpan: opt.value })}
                 title={opt.desc}
-                className={`py-1.5 text-xs font-medium rounded-md border transition-all ${
+                className={`py-1.5 text-xs font-semibold rounded-md border transition-all ${
                   colSpan === opt.value
-                    ? 'bg-indigo-600 text-white border-indigo-600'
-                    : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300 hover:text-indigo-600'
+                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                    : 'bg-white text-slate-500 border-slate-200 hover:border-indigo-300 hover:text-indigo-600'
                 }`}
               >
                 {opt.label}
               </button>
             ))}
           </div>
-          <p className="text-xs text-slate-400 mt-1.5">
-            {COL_SPAN_OPTIONS.find(o => o.value === colSpan)?.desc} — {colSpan} of 4 columns
+          <p className="text-[10px] text-slate-400">
+            {COL_SPAN_OPTIONS.find(o => o.value === colSpan)?.desc} — {colSpan}/4 columns
           </p>
-        </div>
+        </Section>
 
-        {/* Row grouping */}
-        <div>
-          <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
-            <div className="flex items-center gap-1.5">
-              <Rows3 className="w-3.5 h-3.5" />
-              Row
-            </div>
-          </label>
-          <div className="space-y-2">
-            {/* Current row — own row */}
-            <button
-              onClick={() => {
-                // Move to its own unique row (max + 1)
-                const maxRow = allFields.reduce((max, f) => Math.max(max, f.row ?? 0), -1);
-                handleChange({ row: maxRow + 1 });
-              }}
-              className={`w-full text-left px-3 py-2 text-xs rounded-lg border transition-all ${
-                !allFields.some(f => f.id !== field.id && f.row === row)
-                  ? 'bg-indigo-50 border-indigo-300 text-indigo-700 font-medium'
-                  : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300'
-              }`}
-            >
-              Own row (full width)
-            </button>
+        {/* ── Row Layout Presets ── */}
+        <Section
+          title="Row Layout"
+          icon={<LayoutGrid className="w-3.5 h-3.5" />}
+          defaultOpen={false}
+          badge={hasMultipleInRow ? `${rowFields.length} fields` : undefined}
+        >
+          <p className="text-[10px] text-slate-400 -mt-1">
+            {hasMultipleInRow
+              ? `Applies to all ${rowFields.length} fields in this row`
+              : 'Add more fields to this row to use presets'}
+          </p>
 
-            {/* Existing rows that have other fields */}
-            {Array.from(new Set(allFields.filter(f => f.id !== field.id).map(f => f.row ?? 0))).map((rowNum) => {
-              const rowFields = allFields.filter(f => f.id !== field.id && (f.row ?? 0) === rowNum);
-              const isCurrentRow = row === rowNum;
-              return (
-                <button
-                  key={rowNum}
-                  onClick={() => handleChange({ row: rowNum })}
-                  className={`w-full text-left px-3 py-2 text-xs rounded-lg border transition-all ${
-                    isCurrentRow
-                      ? 'bg-indigo-50 border-indigo-300 text-indigo-700 font-medium'
-                      : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300'
-                  }`}
-                >
-                  <span className="font-medium">Same row as:</span>{' '}
-                  {rowFields.map(f => f.label).join(', ')}
-                </button>
-              );
-            })}
+          <div className="space-y-1">
+            <PresetBtn label="Full width" bars={[4]} onClick={() => applyPreset([4])} />
+            <PresetBtn label="½ + ½" bars={[2, 2]} onClick={() => applyPreset([2, 2])} disabled={!hasMultipleInRow} />
+            <PresetBtn label="⅓ + ⅓ + ⅓" bars={[1, 1, 1]} onClick={() => applyPreset([1, 1, 1])} disabled={!hasMultipleInRow} />
+            <PresetBtn label="¼ + ¼ + ¼ + ¼" bars={[1, 1, 1, 1]} onClick={() => applyPreset([1, 1, 1, 1])} disabled={!hasMultipleInRow} />
+            <PresetBtn label="⅓ + ⅔" bars={[1, 3]} onClick={() => applyPreset([1, 3])} disabled={!hasMultipleInRow} />
+            <PresetBtn label="⅔ + ⅓" bars={[3, 1]} onClick={() => applyPreset([3, 1])} disabled={!hasMultipleInRow} />
+            <PresetBtn label="¼ + ¾" bars={[1, 3]} onClick={() => applyPreset([1, 3])} disabled={!hasMultipleInRow} />
+            <PresetBtn label="¾ + ¼" bars={[3, 1]} onClick={() => applyPreset([3, 1])} disabled={!hasMultipleInRow} />
           </div>
-          <p className="text-xs text-slate-400 mt-1.5">
-            Place in same row to display side by side
-          </p>
-        </div>
+        </Section>
 
-        {/* Dropdown Options */}
-        {field.type === 'dropdown' && (
-          <div>
-            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
-              Options
-            </label>
-            <div className="space-y-2">
+        {/* ── Options (Dropdown / Radio / Checkbox) ── */}
+        {(field.type === 'dropdown' || field.type === 'radio' || field.type === 'checkbox') && (
+          <Section title="Options" badge={`${options.length}`}>
+            <div className="space-y-1.5">
               {options.map((opt, i) => (
                 <div key={i} className="flex items-center gap-1.5">
                   <input
                     type="text"
                     value={opt}
                     onChange={(e) => updateOption(i, e.target.value)}
-                    className="flex-1 px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="flex-1 px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                   <button
                     onClick={() => removeOption(i)}
-                    className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"
+                    className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
+                    <Trash2 className="w-3 h-3" />
                   </button>
                 </div>
               ))}
               <button
                 onClick={addOption}
-                className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium text-indigo-600 border border-dashed border-indigo-300 rounded-lg hover:bg-indigo-50 transition-colors"
+                className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium text-indigo-600 border border-dashed border-indigo-200 rounded-lg hover:bg-indigo-50 transition-colors"
               >
-                <Plus className="w-3.5 h-3.5" /> Add Option
+                <Plus className="w-3 h-3" /> Add Option
               </button>
             </div>
-          </div>
+          </Section>
         )}
 
-        {/* Validation */}
-        {(field.type === 'text' || field.type === 'number') && (
-          <div className="border-t border-slate-100 pt-4">
-            <div className="flex items-center gap-1.5 mb-3">
-              <ShieldCheck className="w-3.5 h-3.5 text-indigo-500" />
-              <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
-                Validation
-              </label>
+        {/* ── Dual Input Labels ── */}
+        {field.type === 'dual-input' && (
+          <Section title="Input Labels" badge="2 fields">
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">First input label</label>
+              <input
+                type="text"
+                value={field.dualInputLabels?.[0] ?? 'Min'}
+                onChange={(e) => {
+                  const labels: [string, string] = [e.target.value, field.dualInputLabels?.[1] ?? 'Max'];
+                  handleChange({ dualInputLabels: labels });
+                }}
+                className="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-2"
+                placeholder="e.g. Min, From, Start"
+              />
+              <label className="block text-xs font-medium text-slate-500 mb-1">Second input label</label>
+              <input
+                type="text"
+                value={field.dualInputLabels?.[1] ?? 'Max'}
+                onChange={(e) => {
+                  const labels: [string, string] = [field.dualInputLabels?.[0] ?? 'Min', e.target.value];
+                  handleChange({ dualInputLabels: labels });
+                }}
+                className="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                placeholder="e.g. Max, To, End"
+              />
             </div>
+          </Section>
+        )}
 
-            {/* ── Text validations ── */}
+        {/* ── Validation ── */}
+        {(field.type === 'text' || field.type === 'number') && (
+          <Section
+            title="Validation"
+            icon={<ShieldCheck className="w-3.5 h-3.5" />}
+            defaultOpen={hasValidation}
+            badge={hasValidation ? 'Active' : undefined}
+          >
             {field.type === 'text' && (
-              <div className="space-y-4">
-
-                {/* Predefined Patterns */}
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-medium text-slate-600 flex items-center gap-1.5">
-                    <Zap className="w-3 h-3 text-amber-500" />
-                    Quick Patterns
+              <div className="space-y-3">
+                {/* Quick patterns */}
+                <div>
+                  <label className="flex items-center gap-1 text-xs font-medium text-slate-500 mb-1">
+                    <Zap className="w-3 h-3 text-amber-500" /> Quick Patterns
                   </label>
                   <select
                     onChange={(e) => {
                       if (e.target.value) {
-                        const pattern = REGEX_PATTERNS.find(p => p.id === e.target.value);
-                        if (pattern) {
-                          handleValidationChange({ 
-                            regex: pattern.pattern,
-                            regexMessage: `Must match ${pattern.label.toLowerCase()}`
-                          });
+                        const p = REGEX_PATTERNS.find(x => x.id === e.target.value);
+                        if (p) {
+                          handleValidationChange({ regex: p.pattern, regexMessage: `Must match ${p.label.toLowerCase()}` });
                           e.target.value = '';
                         }
                       }
                     }}
-                    className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                    className="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
                   >
-                    <option value="">Select a pattern...</option>
+                    <option value="">Select a pattern…</option>
                     {REGEX_PATTERNS.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.label} — {p.example}
-                      </option>
+                      <option key={p.id} value={p.id}>{p.label} — {p.example}</option>
                     ))}
                   </select>
-                  <p className="text-xs text-slate-400">Click to auto-fill regex pattern</p>
                 </div>
 
-                {/* Min Length */}
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-medium text-slate-600">Min Length</label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={validation.minLength ?? ''}
-                    onChange={(e) => handleValidationChange({ minLength: e.target.value ? Number(e.target.value) : undefined })}
-                    placeholder="No minimum"
-                    className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                  {validation.minLength !== undefined && (
+                {/* Min / Max length side by side */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-500 mb-1">Min length</label>
                     <input
-                      type="text"
-                      value={validation.minLengthMessage || ''}
-                      onChange={(e) => handleValidationChange({ minLengthMessage: e.target.value || undefined })}
-                      placeholder={`e.g. Must be at least ${validation.minLength} characters`}
-                      className="w-full px-2.5 py-1.5 text-xs border border-slate-200 bg-slate-50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      type="number" min={0}
+                      value={validation.minLength ?? ''}
+                      onChange={(e) => handleValidationChange({ minLength: e.target.value ? Number(e.target.value) : undefined })}
+                      placeholder="—"
+                      className="w-full px-2 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     />
-                  )}
-                </div>
-
-                {/* Max Length */}
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-medium text-slate-600">Max Length</label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={validation.maxLength ?? ''}
-                    onChange={(e) => handleValidationChange({ maxLength: e.target.value ? Number(e.target.value) : undefined })}
-                    placeholder="No maximum"
-                    className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                  {validation.maxLength !== undefined && (
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-500 mb-1">Max length</label>
                     <input
-                      type="text"
-                      value={validation.maxLengthMessage || ''}
-                      onChange={(e) => handleValidationChange({ maxLengthMessage: e.target.value || undefined })}
-                      placeholder={`e.g. Cannot exceed ${validation.maxLength} characters`}
-                      className="w-full px-2.5 py-1.5 text-xs border border-slate-200 bg-slate-50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      type="number" min={0}
+                      value={validation.maxLength ?? ''}
+                      onChange={(e) => handleValidationChange({ maxLength: e.target.value ? Number(e.target.value) : undefined })}
+                      placeholder="—"
+                      className="w-full px-2 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     />
-                  )}
+                  </div>
                 </div>
 
-                {/* Regex Pattern */}
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-medium text-slate-600">Regex Pattern</label>
+                {/* Custom messages for min/max */}
+                {validation.minLength !== undefined && (
+                  <input type="text" value={validation.minLengthMessage || ''}
+                    onChange={(e) => handleValidationChange({ minLengthMessage: e.target.value || undefined })}
+                    placeholder={`Min length error message`}
+                    className="w-full px-2.5 py-1.5 text-xs border border-slate-200 bg-slate-50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                )}
+                {validation.maxLength !== undefined && (
+                  <input type="text" value={validation.maxLengthMessage || ''}
+                    onChange={(e) => handleValidationChange({ maxLengthMessage: e.target.value || undefined })}
+                    placeholder={`Max length error message`}
+                    className="w-full px-2.5 py-1.5 text-xs border border-slate-200 bg-slate-50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                )}
+
+                {/* Regex */}
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1">Regex Pattern</label>
                   <input
                     type="text"
                     value={validation.regex || ''}
                     onChange={(e) => handleValidationChange({ regex: e.target.value || undefined })}
-                    placeholder="e.g. /^[A-Z][a-zA-Z]*$/"
+                    placeholder="/^[A-Z].*$/"
                     className={`w-full px-2.5 py-1.5 text-xs font-mono border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
                       validation.regex
-                        ? isValidRegexPattern(validation.regex)
-                          ? 'border-emerald-400 bg-emerald-50'
-                          : 'border-red-400 bg-red-50'
-                        : 'border-slate-300'
+                        ? isValidRegexPattern(validation.regex) ? 'border-emerald-400 bg-emerald-50' : 'border-red-400 bg-red-50'
+                        : 'border-slate-200'
                     }`}
                   />
                   {validation.regex && (
                     isValidRegexPattern(validation.regex)
-                      ? <p className="text-xs text-emerald-600">✓ Valid — strictly enforced</p>
-                      : <p className="text-xs text-red-500">✗ Invalid regex — users will be blocked</p>
+                      ? <p className="text-[10px] text-emerald-600 mt-0.5">✓ Valid pattern</p>
+                      : <p className="text-[10px] text-red-500 mt-0.5">✗ Invalid regex</p>
                   )}
-                  {!validation.regex && (
-                    <p className="text-xs text-slate-400">Supports /pattern/flags or plain pattern</p>
-                  )}
-                  {/* Regex error message — only shown when regex is set */}
                   {validation.regex && isValidRegexPattern(validation.regex) && (
-                    <input
-                      type="text"
-                      value={validation.regexMessage || ''}
+                    <input type="text" value={validation.regexMessage || ''}
                       onChange={(e) => handleValidationChange({ regexMessage: e.target.value || undefined })}
-                      placeholder="e.g. Must start with a capital letter"
-                      className="w-full px-2.5 py-1.5 text-xs border border-slate-200 bg-slate-50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      placeholder="Error message for this pattern"
+                      className="w-full mt-1.5 px-2.5 py-1.5 text-xs border border-slate-200 bg-slate-50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     />
                   )}
                 </div>
-
               </div>
             )}
 
-            {/* ── Number validations ── */}
             {field.type === 'number' && (
-              <div className="space-y-4">
-
-                {/* Min Value */}
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-medium text-slate-600">Min Value</label>
-                  <input
-                    type="number"
-                    value={validation.min ?? ''}
-                    onChange={(e) => handleValidationChange({ min: e.target.value ? Number(e.target.value) : undefined })}
-                    placeholder="No minimum"
-                    className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                  {validation.min !== undefined && (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-500 mb-1">Min value</label>
                     <input
-                      type="text"
-                      value={validation.minMessage || ''}
-                      onChange={(e) => handleValidationChange({ minMessage: e.target.value || undefined })}
-                      placeholder={`e.g. Value must be at least ${validation.min}`}
-                      className="w-full px-2.5 py-1.5 text-xs border border-slate-200 bg-slate-50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      type="number"
+                      value={validation.min ?? ''}
+                      onChange={(e) => handleValidationChange({ min: e.target.value ? Number(e.target.value) : undefined })}
+                      placeholder="—"
+                      className="w-full px-2 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     />
-                  )}
-                </div>
-
-                {/* Max Value */}
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-medium text-slate-600">Max Value</label>
-                  <input
-                    type="number"
-                    value={validation.max ?? ''}
-                    onChange={(e) => handleValidationChange({ max: e.target.value ? Number(e.target.value) : undefined })}
-                    placeholder="No maximum"
-                    className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                  {validation.max !== undefined && (
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-500 mb-1">Max value</label>
                     <input
-                      type="text"
-                      value={validation.maxMessage || ''}
-                      onChange={(e) => handleValidationChange({ maxMessage: e.target.value || undefined })}
-                      placeholder={`e.g. Value cannot exceed ${validation.max}`}
-                      className="w-full px-2.5 py-1.5 text-xs border border-slate-200 bg-slate-50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      type="number"
+                      value={validation.max ?? ''}
+                      onChange={(e) => handleValidationChange({ max: e.target.value ? Number(e.target.value) : undefined })}
+                      placeholder="—"
+                      className="w-full px-2 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     />
-                  )}
+                  </div>
                 </div>
-
+                {validation.min !== undefined && (
+                  <input type="text" value={validation.minMessage || ''}
+                    onChange={(e) => handleValidationChange({ minMessage: e.target.value || undefined })}
+                    placeholder="Min value error message"
+                    className="w-full px-2.5 py-1.5 text-xs border border-slate-200 bg-slate-50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                )}
+                {validation.max !== undefined && (
+                  <input type="text" value={validation.maxMessage || ''}
+                    onChange={(e) => handleValidationChange({ maxMessage: e.target.value || undefined })}
+                    placeholder="Max value error message"
+                    className="w-full px-2.5 py-1.5 text-xs border border-slate-200 bg-slate-50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                )}
               </div>
             )}
-
-          </div>
+          </Section>
         )}
-
-        {/* Required toggle */}
-        <div className="flex items-center justify-between py-2 border-t border-slate-100">          <div>
-            <p className="text-sm font-medium text-slate-700">Required</p>
-            <p className="text-xs text-slate-400">Must be filled before submit</p>
-          </div>
-          <button
-            onClick={() => handleChange({ required: !required })}
-            className={`relative w-10 h-5 rounded-full transition-colors ${
-              required ? 'bg-indigo-600' : 'bg-slate-200'
-            }`}
-          >
-            <span
-              className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
-                required ? 'translate-x-5' : 'translate-x-0'
-              }`}
-            />
-          </button>
-        </div>
       </div>
     </div>
   );

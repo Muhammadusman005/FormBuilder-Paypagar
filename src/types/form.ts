@@ -1,4 +1,4 @@
-export type FieldType = 'text' | 'number' | 'dropdown' | 'file';
+export type FieldType = 'text' | 'number' | 'dropdown' | 'file' | 'radio' | 'checkbox' | 'dual-input';
 
 export interface FieldValidation {
   regex?: string;               // custom regex pattern (text fields)
@@ -25,6 +25,7 @@ export interface FormField {
   colSpan?: 1 | 2 | 3 | 4; // out of 4 columns, default 4 (full width)
   row?: number;             // row index for grouping fields in the same row
   validation?: FieldValidation;
+  dualInputLabels?: [string, string]; // labels for dual-input fields (e.g. ['Min', 'Max'])
 }
 
 export interface SubForm {

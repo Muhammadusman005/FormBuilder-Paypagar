@@ -4,19 +4,22 @@
  * All utility functions are exported from this single file for easy importing.
  */
 
+// Form field layout (drag-drop, row management)
+export {
+  renumberRows,
+  equalColSpan,
+  nextRowIndex,
+  mergeFieldIntoRow,
+  moveFieldToNewRow,
+  insertFieldIntoRow,
+  insertFieldAsNewRow,
+} from './fieldLayout';
+
 // Validation
 export {
-  parseRegex,
-  isValidRegex,
   validateField,
   validateAllFields,
-} from './validation';
-
-// ID generation
-export { generateId } from './id';
-
-// Schema building
-export { buildFormSchema } from './schema';
+} from './form';
 
 // Error handling
 export {
@@ -25,7 +28,6 @@ export {
   isNetworkError,
   isTimeoutError,
   ERROR_MESSAGES,
-  type ApiError,
 } from './errors';
 
 // Toast notifications
@@ -34,8 +36,4 @@ export {
   showError,
   showInfo,
   showWarning,
-  showToast,
-  onToast,
-  type Toast,
-  type ToastType,
 } from './toast';

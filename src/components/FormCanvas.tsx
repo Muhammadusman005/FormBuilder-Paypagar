@@ -1,39 +1,112 @@
-import { useState, useRef } from 'react';
+import { useState, useCallback } from 'react';
 import type { FormField } from '../types/form';
 import { FormFieldPreview } from './FormFieldPreview';
-import { Layers } from 'lucide-react';
+import { Layers, Plus, ArrowDown } from 'lucide-react';
 import { GRID_COLUMNS } from '../constants';
+import { mergeFieldIntoRow, moveFieldToNewRow } from '../utils/fieldLayout';
+
+const DT_FIELD_ID = 'application/x-field-id';
+const DT_PALETTE  = 'application/x-palette-type';
 
 interface Props {
   title: string;
   fields: FormField[];
   selectedFieldId: string | null;
   draggedId: string | null;
+  draggedComponentType?: string | null;
   onFieldDragStart: (id: string) => void;
+  onFieldDragEnd: () => void;
   onFieldsUpdate: (fields: FormField[]) => void;
   onDelete: (id: string) => void;
   onSelect: (field: FormField) => void;
   onCanvasDrop: (e: React.DragEvent) => void;
+  onCanvasDropIntoRow?: (e: React.DragEvent, targetRow: number, insertAtIndex: number) => void;
 }
 
-type DropZone =
-  | { type: 'row'; rowKey: number }           // drop between rows → new row
-  | { type: 'merge'; targetFieldId: string }; // drop on a field → merge into same row
+type DropTarget =
+  | { kind: 'row-gap'; afterRowKey: number }
+  | { kind: 'slot'; rowKey: number; slotIndex: number }
+  | null;
+
+// ── Stable sub-components (outside FormCanvas to avoid remount on re-render) ─
+
+interface DropSlotProps {
+  rowKey: number;
+  slotIndex: number;
+  isActive: boolean;
+  onDragOver: (e: React.DragEvent, rowKey: number, slotIndex: number) => void;
+  onDrop:     (e: React.DragEvent, rowKey: number, slotIndex: number) => void;
+}
+
+const DropSlot = ({ rowKey, slotIndex, isActive, onDragOver, onDrop }: DropSlotProps) => (
+  <div
+    onDragOver={e => onDragOver(e, rowKey, slotIndex)}
+    onDrop={e => onDrop(e, rowKey, slotIndex)}
+    className={`flex items-center justify-center rounded-lg border-2 border-dashed transition-colors ${
+      isActive
+        ? 'border-indigo-400 bg-indigo-50'
+        : 'border-slate-200 bg-slate-50 hover:border-indigo-300 hover:bg-indigo-50/60'
+    }`}
+    style={{ minHeight: 76 }}
+  >
+    <div className={`flex flex-col items-center gap-1 ${isActive ? 'text-indigo-500' : 'text-slate-300'}`}>
+      <Plus className="w-4 h-4" />
+      {isActive && <span className="text-[10px] font-semibold">Drop here</span>}
+    </div>
+  </div>
+);
+
+interface RowGapProps {
+  afterRowKey: number;
+  isActive:   boolean;
+  isAnyDrag:  boolean;
+  onDragOver: (e: React.DragEvent, afterRowKey: number) => void;
+  onDrop:     (e: React.DragEvent, afterRowKey: number) => void;
+}
+
+const RowGap = ({ afterRowKey, isActive, isAnyDrag, onDragOver, onDrop }: RowGapProps) => (
+  <div
+    onDragOver={e => onDragOver(e, afterRowKey)}
+    onDrop={e => onDrop(e, afterRowKey)}
+    className={`mx-1 rounded-lg flex items-center justify-center gap-1.5 transition-all ${
+      isActive
+        ? 'h-10 border-2 border-dashed border-indigo-400 bg-indigo-50'
+        : isAnyDrag
+        ? 'h-5 border border-dashed border-slate-300 hover:border-indigo-300 hover:bg-indigo-50/40'
+        : 'h-2'
+    }`}
+  >
+    {isActive && (
+      <>
+        <ArrowDown className="w-3 h-3 text-indigo-400" />
+        <span className="text-xs text-indigo-500 font-medium">New row here</span>
+      </>
+    )}
+  </div>
+);
+
+// ── Main component ────────────────────────────────────────────────────────
 
 export const FormCanvas = ({
   title,
   fields,
   selectedFieldId,
   draggedId,
+  draggedComponentType,
   onFieldDragStart,
+  onFieldDragEnd,
   onFieldsUpdate,
   onDelete,
   onSelect,
   onCanvasDrop,
+  onCanvasDropIntoRow,
 }: Props) => {
   const [isDragOver, setIsDragOver] = useState(false);
-  const [dropZone, setDropZone] = useState<DropZone | null>(null);
-  const dragSourceId = useRef<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<DropTarget>(null);
+
+  const isDraggingField   = !!draggedId;
+  const isDraggingPalette = !!draggedComponentType && !draggedId;
+  const isAnyDrag         = isDraggingField || isDraggingPalette;
 
   // Group fields by row
   const groupedRows = fields.reduce<Map<number, FormField[]>>((acc, field) => {
@@ -44,269 +117,301 @@ export const FormCanvas = ({
   }, new Map());
   const sortedRows = Array.from(groupedRows.entries()).sort(([a], [b]) => a - b);
 
-  // ── Canvas-level drag (from palette) ──────────────────────────
+  // ── Canvas handlers ────────────────────────────────────────────
   const handleCanvasDragOver = (e: React.DragEvent) => {
     e.preventDefault();
-    // Only show canvas-level drop if dragging from palette (no dragSourceId)
-    if (!dragSourceId.current) setIsDragOver(true);
+    if (fields.length === 0) setIsDragOver(true);
   };
 
   const handleCanvasDragLeave = (e: React.DragEvent) => {
     if (!e.currentTarget.contains(e.relatedTarget as Node)) {
       setIsDragOver(false);
-      setDropZone(null);
+      setDropTarget(null);
     }
   };
 
   const handleCanvasDrop = (e: React.DragEvent) => {
     setIsDragOver(false);
-    setDropZone(null);
-    dragSourceId.current = null;
+    setDropTarget(null);
     onCanvasDrop(e);
   };
 
-  // ── Field drag start ──────────────────────────────────────────
-  const handleFieldDragStart = (e: React.DragEvent, fieldId: string) => {
-    dragSourceId.current = fieldId;
+  // ── Field drag handlers ────────────────────────────────────────
+  const handleFieldDragStart = useCallback((e: React.DragEvent, fieldId: string) => {
     e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData(DT_FIELD_ID, fieldId);
     onFieldDragStart(fieldId);
-  };
+  }, [onFieldDragStart]);
 
-  // ── Drop on a field → merge into same row ─────────────────────
-  const handleFieldDragOver = (e: React.DragEvent, targetFieldId: string) => {
+  const handleFieldDragEnd = useCallback(() => {
+    setDropTarget(null);
+    onFieldDragEnd();
+  }, [onFieldDragEnd]);
+
+  // ── Slot handlers ──────────────────────────────────────────────
+  const handleSlotDragOver = useCallback((e: React.DragEvent, rowKey: number, slotIndex: number) => {
     e.preventDefault();
     e.stopPropagation();
-    if (dragSourceId.current && dragSourceId.current !== targetFieldId) {
-      setDropZone({ type: 'merge', targetFieldId });
+    setDropTarget({ kind: 'slot', rowKey, slotIndex });
+  }, []);
+
+  const handleSlotDrop = useCallback((e: React.DragEvent, rowKey: number, slotIndex: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDropTarget(null);
+
+    const fieldId     = e.dataTransfer.getData(DT_FIELD_ID);
+    const paletteType = e.dataTransfer.getData(DT_PALETTE);
+
+    if (paletteType && onCanvasDropIntoRow) {
+      onCanvasDropIntoRow(e, rowKey, slotIndex);
+      return;
     }
-  };
-
-  const handleFieldDrop = (e: React.DragEvent, targetFieldId: string) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDropZone(null);
-
-    const sourceId = dragSourceId.current;
-    dragSourceId.current = null;
-    if (!sourceId || sourceId === targetFieldId) return;
-
-    const sourceField = fields.find(f => f.id === sourceId);
-    const targetField = fields.find(f => f.id === targetFieldId);
-    if (!sourceField || !targetField) return;
-
-    const sourceRow = sourceField.row ?? 0;
-    const targetRow = targetField.row ?? 0;
-
-    if (sourceRow === targetRow) {
-      // Same row → reorder within the row
-      const updated = [...fields];
-      const fromIdx = updated.findIndex(f => f.id === sourceId);
-      const toIdx = updated.findIndex(f => f.id === targetFieldId);
-      const [moved] = updated.splice(fromIdx, 1);
-      updated.splice(toIdx, 0, moved);
-      onFieldsUpdate(updated);
-    } else {
-      // Different row → merge source into target's row
-      // Auto-adjust colSpan so they fit: split 4 columns equally
-      const targetRowFields = fields.filter(f => (f.row ?? 0) === targetRow);
-      const newCount = targetRowFields.length + 1;
-      const newColSpan = Math.max(1, Math.floor(4 / newCount)) as 1 | 2 | 3 | 4;
-
-      const updated = fields.map(f => {
-        if (f.id === sourceId) {
-          return { ...f, row: targetRow, colSpan: newColSpan };
-        }
-        if ((f.row ?? 0) === targetRow) {
-          return { ...f, colSpan: newColSpan };
-        }
-        return f;
-      });
-
-      // Clean up empty rows — renumber rows to stay sequential
-      const usedRows = new Set(updated.map(f => f.row ?? 0));
-      const rowMap = new Map<number, number>();
-      Array.from(usedRows).sort((a, b) => a - b).forEach((r, i) => rowMap.set(r, i));
-      const renumbered = updated.map(f => ({ ...f, row: rowMap.get(f.row ?? 0) ?? 0 }));
-
-      onFieldsUpdate(renumbered);
+    if (fieldId) {
+      onFieldsUpdate(mergeFieldIntoRow(fields, fieldId, rowKey, slotIndex));
     }
-  };
+  }, [fields, onFieldsUpdate, onCanvasDropIntoRow]);
 
-  // ── Drop between rows → insert as new row ─────────────────────
-  const handleRowGapDragOver = (e: React.DragEvent, afterRowKey: number) => {
+  // ── Row gap handlers ───────────────────────────────────────────
+  const handleRowGapDragOver = useCallback((e: React.DragEvent, afterRowKey: number) => {
     e.preventDefault();
     e.stopPropagation();
-    if (dragSourceId.current) setDropZone({ type: 'row', rowKey: afterRowKey });
-  };
+    setDropTarget({ kind: 'row-gap', afterRowKey });
+  }, []);
 
-  const handleRowGapDrop = (e: React.DragEvent, afterRowKey: number) => {
+  const handleRowGapDrop = useCallback((e: React.DragEvent, afterRowKey: number) => {
     e.preventDefault();
     e.stopPropagation();
-    setDropZone(null);
+    setDropTarget(null);
 
-    const sourceId = dragSourceId.current;
-    dragSourceId.current = null;
-    if (!sourceId) return;
+    const fieldId     = e.dataTransfer.getData(DT_FIELD_ID);
+    const paletteType = e.dataTransfer.getData(DT_PALETTE);
 
-    const sourceField = fields.find(f => f.id === sourceId);
-    if (!sourceField) return;
-
-    const sourceRow = sourceField.row ?? 0;
-
-    // If source is already a solo field at this position, no-op
-    const sourceRowFields = fields.filter(f => (f.row ?? 0) === sourceRow);
-
-    // Insert source as a new row after `afterRowKey`
-    // Shift all rows after afterRowKey up by 1, then place source at afterRowKey + 1
-    const newRowIndex = afterRowKey + 1;
-
-    let updated = fields.map(f => {
-      if (f.id === sourceId) return f; // handle separately
-      const r = f.row ?? 0;
-      if (r >= newRowIndex) return { ...f, row: r + 1 };
-      return f;
-    });
-
-    // If source was the only field in its row, remove that row and re-compact
-    const wasAlone = sourceRowFields.length === 1;
-
-    updated = updated.map(f => {
-      if (f.id === sourceId) {
-        return { ...f, row: newRowIndex, colSpan: 4 as const };
-      }
-      return f;
-    });
-
-    // If source left its row alone, restore colSpan of remaining fields in that row
-    if (!wasAlone) {
-      const oldRowFields = updated.filter(f => f.id !== sourceId && (f.row ?? 0) === sourceRow);
-      const newColSpan = Math.max(1, Math.floor(4 / oldRowFields.length)) as 1 | 2 | 3 | 4;
-      updated = updated.map(f => {
-        if (f.id !== sourceId && (f.row ?? 0) === sourceRow) {
-          return { ...f, colSpan: newColSpan };
-        }
-        return f;
-      });
+    if (paletteType && onCanvasDropIntoRow) {
+      onCanvasDropIntoRow(e, afterRowKey, -1);
+      return;
     }
+    if (fieldId) {
+      onFieldsUpdate(moveFieldToNewRow(fields, fieldId, afterRowKey));
+    }
+  }, [fields, onFieldsUpdate, onCanvasDropIntoRow]);
 
-    // Renumber rows sequentially
-    const usedRows = new Set(updated.map(f => f.row ?? 0));
-    const rowMap = new Map<number, number>();
-    Array.from(usedRows).sort((a, b) => a - b).forEach((r, i) => rowMap.set(r, i));
-    const renumbered = updated.map(f => ({ ...f, row: rowMap.get(f.row ?? 0) ?? 0 }));
-
-    onFieldsUpdate(renumbered);
-  };
-
-  const handleFieldDragEnd = () => {
-    dragSourceId.current = null;
-    setDropZone(null);
-  };
-
+  // ── Render ─────────────────────────────────────────────────────
   return (
-    <div className="flex-1 overflow-y-auto p-6 bg-slate-100">
+    <div className="flex-1 overflow-y-auto p-5 bg-slate-100/80">
       <div className="max-w-3xl mx-auto">
-        <p className="text-xs font-medium text-slate-400 uppercase tracking-wide mb-3">Canvas</p>
+
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Canvas</p>
+          {fields.length > 0 && (
+            <p className="text-xs text-slate-400">
+              {fields.length} field{fields.length !== 1 ? 's' : ''} · {sortedRows.length} row{sortedRows.length !== 1 ? 's' : ''}
+            </p>
+          )}
+        </div>
 
         <div
           onDragOver={handleCanvasDragOver}
           onDragLeave={handleCanvasDragLeave}
           onDrop={handleCanvasDrop}
-          className={`bg-white rounded-xl border-2 border-dashed min-h-[480px] transition-all ${
-            isDragOver
-              ? 'border-indigo-400 bg-indigo-50/50 shadow-lg shadow-indigo-100'
-              : 'border-slate-200 hover:border-slate-300'
+          className={`bg-white rounded-xl shadow-sm transition-all ${
+            isDragOver && fields.length === 0
+              ? 'ring-2 ring-indigo-400 ring-offset-2'
+              : 'ring-1 ring-slate-200'
           }`}
         >
-          {/* Form header */}
-          <div className="px-6 pt-5 pb-4 border-b border-slate-100">
-            <h2 className="text-base font-semibold text-slate-900">{title || 'Untitled Form'}</h2>
-            <p className="text-xs text-slate-400 mt-0.5">
-              {fields.length} field{fields.length !== 1 ? 's' : ''}
-            </p>
+          {/* Header */}
+          <div className="px-6 pt-5 pb-4 border-b border-slate-100 flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-semibold text-slate-900">{title || 'Untitled Form'}</h2>
+              <p className="text-xs text-slate-400 mt-0.5">
+                {fields.length === 0 ? 'No fields yet' : `${fields.length} field${fields.length !== 1 ? 's' : ''}`}
+              </p>
+            </div>
+            {fields.length > 0 && (
+              <div className="flex items-center gap-1">
+                {sortedRows.map(([rowKey, rowFields]) => (
+                  <div key={rowKey} className="flex gap-0.5" title={`Row ${rowKey + 1}`}>
+                    {rowFields.map(f => (
+                      <div
+                        key={f.id}
+                        className={`h-1.5 rounded-full ${selectedFieldId === f.id ? 'bg-indigo-500' : 'bg-slate-300'}`}
+                        style={{ width: `${(f.colSpan ?? 4) * 4}px` }}
+                      />
+                    ))}
+                    <div className="w-px bg-slate-200 mx-0.5" />
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="p-4">
             {fields.length === 0 ? (
-              <div className={`flex flex-col items-center justify-center py-16 transition-all ${isDragOver ? 'scale-105' : ''}`}>
-                <div className={`w-14 h-14 rounded-xl flex items-center justify-center mb-3 transition-colors ${isDragOver ? 'bg-indigo-100' : 'bg-slate-100'}`}>
-                  <Layers className={`w-6 h-6 ${isDragOver ? 'text-indigo-500' : 'text-slate-400'}`} />
+              <div className={`flex flex-col items-center justify-center py-16 rounded-lg border-2 border-dashed transition-all ${
+                isDragOver ? 'border-indigo-300 bg-indigo-50/50' : 'border-slate-200'
+              }`}>
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-3 ${isDragOver ? 'bg-indigo-100' : 'bg-slate-100'}`}>
+                  <Layers className={`w-5 h-5 ${isDragOver ? 'text-indigo-500' : 'text-slate-400'}`} />
                 </div>
                 <p className={`text-sm font-medium ${isDragOver ? 'text-indigo-600' : 'text-slate-500'}`}>
-                  {isDragOver ? 'Drop to add field' : 'Drag components here'}
+                  {isDragOver ? 'Release to add field' : 'Drag a field here'}
                 </p>
-                <p className="text-xs text-slate-400 mt-1">Your form fields will appear here</p>
+                <p className="text-xs text-slate-400 mt-1">Or click a field in the left panel</p>
               </div>
             ) : (
               <div className="flex flex-col">
-                {sortedRows.map(([rowKey, rowFields], rowIndex) => (
-                  <div key={rowKey}>
-                    {/* ── Gap zone BEFORE this row (except first) ── */}
-                    {rowIndex > 0 && (
-                      <div
-                        onDragOver={(e) => handleRowGapDragOver(e, sortedRows[rowIndex - 1][0])}
-                        onDrop={(e) => handleRowGapDrop(e, sortedRows[rowIndex - 1][0])}
-                        className={`h-3 mx-1 rounded transition-all my-0.5 ${
-                          dropZone?.type === 'row' && dropZone.rowKey === sortedRows[rowIndex - 1][0]
-                            ? 'bg-indigo-300 h-6'
-                            : 'hover:bg-indigo-100'
-                        }`}
-                      />
-                    )}
+                {sortedRows.map(([rowKey, rowFields], rowIndex) => {
+                  // Calculate how many grid columns each item should take.
+                  // During drag: each field shrinks by 1 col to make room for ONE slot.
+                  // We only show ONE slot at a time (the active one or the "after" slot).
+                  // To keep layout stable, we always show slots but give them minimal space
+                  // unless active.
+                  const fieldCount = rowFields.length;
+                  // Total grid cols used by fields during drag (each field keeps its colSpan)
+                  // Slots each take 1 col. We show fieldCount+1 slots during drag.
+                  // So we need: sum(fieldColSpans) + (fieldCount+1)*1 <= GRID_COLUMNS
+                  // We achieve this by reducing each field's colSpan proportionally.
+                  // Simple approach: each field gets colSpan - floor(colSpan * slotsNeeded / totalCols)
+                  // Even simpler: just use a separate flex row for drag mode.
 
-                    {/* ── Row of fields ── */}
-                    <div
-                      style={{
-                        display: 'grid',
-                        gridTemplateColumns: `repeat(${GRID_COLUMNS}, 1fr)`,
-                        gap: '12px',
-                        marginBottom: '0',
-                      }}
-                    >
-                      {rowFields.map((field) => (
+                  return (
+                    <div key={rowKey}>
+                      {rowIndex > 0 && (
+                        <RowGap
+                          afterRowKey={sortedRows[rowIndex - 1][0]}
+                          isActive={dropTarget?.kind === 'row-gap' && dropTarget.afterRowKey === sortedRows[rowIndex - 1][0]}
+                          isAnyDrag={isAnyDrag}
+                          onDragOver={handleRowGapDragOver}
+                          onDrop={handleRowGapDrop}
+                        />
+                      )}
+
+                      {/* Row label */}
+                      <div className="flex items-center gap-2 mb-1.5 px-0.5">
+                        <span className="text-[10px] font-medium text-slate-400 uppercase tracking-wide">
+                          Row {rowIndex + 1}
+                        </span>
+                        <div className="flex-1 h-px bg-slate-100" />
+                        <span className="text-[10px] text-slate-300">
+                          {fieldCount} field{fieldCount !== 1 ? 's' : ''}
+                        </span>
+                      </div>
+
+                      {/* ── Normal mode: CSS grid ── */}
+                      {!isAnyDrag && (
                         <div
-                          key={field.id}
-                          draggable
-                          onDragStart={(e) => handleFieldDragStart(e, field.id)}
-                          onDragEnd={handleFieldDragEnd}
-                          onDragOver={(e) => handleFieldDragOver(e, field.id)}
-                          onDrop={(e) => handleFieldDrop(e, field.id)}
-                          style={{ gridColumn: `span ${field.colSpan ?? GRID_COLUMNS}` }}
-                          className={`transition-all rounded-lg ${
-                            dropZone?.type === 'merge' && dropZone.targetFieldId === field.id
-                              ? 'ring-2 ring-indigo-400 ring-offset-1 bg-indigo-50'
-                              : ''
-                          }`}
+                          style={{
+                            display: 'grid',
+                            gridTemplateColumns: `repeat(${GRID_COLUMNS}, 1fr)`,
+                            gap: 10,
+                          }}
                         >
-                          <FormFieldPreview
-                            field={field}
-                            isSelected={selectedFieldId === field.id}
-                            onDelete={onDelete}
-                            onSelect={onSelect}
-                            isDragging={draggedId === field.id}
-                          />
+                          {rowFields.map(field => (
+                            <div
+                              key={field.id}
+                              draggable
+                              onDragStart={e => handleFieldDragStart(e, field.id)}
+                              onDragEnd={handleFieldDragEnd}
+                              style={{ gridColumn: `span ${field.colSpan ?? GRID_COLUMNS}` }}
+                            >
+                              <FormFieldPreview
+                                field={field}
+                                isSelected={selectedFieldId === field.id}
+                                onDelete={onDelete}
+                                onSelect={onSelect}
+                                isDragging={false}
+                              />
+                            </div>
+                          ))}
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
+                      )}
 
-                {/* ── Gap zone AFTER last row ── */}
-                {sortedRows.length > 0 && (
-                  <div
-                    onDragOver={(e) => handleRowGapDragOver(e, sortedRows[sortedRows.length - 1][0])}
-                    onDrop={(e) => handleRowGapDrop(e, sortedRows[sortedRows.length - 1][0])}
-                    className={`h-3 mx-1 rounded transition-all mt-0.5 ${
-                      dropZone?.type === 'row' && dropZone.rowKey === sortedRows[sortedRows.length - 1][0]
-                        ? 'bg-indigo-300 h-6'
-                        : 'hover:bg-indigo-100'
-                    }`}
-                  />
-                )}
+                      {/* ── Drag mode: flex row with slots ── */}
+                      {isAnyDrag && (
+                        <div className="flex gap-2 items-stretch">
+                          {rowFields.map((field, fieldIndex) => (
+                            <div key={field.id} className="contents">
+                              {/* Slot before this field */}
+                              <div className="flex-none w-14">
+                                <DropSlot
+                                  rowKey={rowKey}
+                                  slotIndex={fieldIndex}
+                                  isActive={
+                                    dropTarget?.kind === 'slot' &&
+                                    dropTarget.rowKey === rowKey &&
+                                    dropTarget.slotIndex === fieldIndex
+                                  }
+                                  onDragOver={handleSlotDragOver}
+                                  onDrop={handleSlotDrop}
+                                />
+                              </div>
+
+                              {/* Field card */}
+                              <div
+                                className="flex-1 min-w-0"
+                                draggable
+                                onDragStart={e => handleFieldDragStart(e, field.id)}
+                                onDragEnd={handleFieldDragEnd}
+                              >
+                                <FormFieldPreview
+                                  field={field}
+                                  isSelected={selectedFieldId === field.id}
+                                  onDelete={onDelete}
+                                  onSelect={onSelect}
+                                  isDragging={draggedId === field.id}
+                                />
+                              </div>
+                            </div>
+                          ))}
+
+                          {/* Slot after last field */}
+                          <div className="flex-none w-14">
+                            <DropSlot
+                              rowKey={rowKey}
+                              slotIndex={rowFields.length}
+                              isActive={
+                                dropTarget?.kind === 'slot' &&
+                                dropTarget.rowKey === rowKey &&
+                                dropTarget.slotIndex === rowFields.length
+                              }
+                              onDragOver={handleSlotDragOver}
+                              onDrop={handleSlotDrop}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {/* Gap after last row */}
+                <RowGap
+                  afterRowKey={sortedRows[sortedRows.length - 1][0]}
+                  isActive={
+                    dropTarget?.kind === 'row-gap' &&
+                    dropTarget.afterRowKey === sortedRows[sortedRows.length - 1][0]
+                  }
+                  isAnyDrag={isAnyDrag}
+                  onDragOver={handleRowGapDragOver}
+                  onDrop={handleRowGapDrop}
+                />
               </div>
             )}
           </div>
         </div>
+
+        {/* Hint */}
+        {fields.length > 0 && !isAnyDrag && (
+          <p className="text-center text-xs text-slate-400 mt-3">
+            Drag fields to reorder · Drop on a row to merge · Click to edit properties
+          </p>
+        )}
+        {isAnyDrag && (
+          <p className="text-center text-xs text-indigo-500 font-medium mt-3">
+            Drop on <strong>+</strong> to add to that row · Drop between rows for a new row
+          </p>
+        )}
       </div>
     </div>
   );

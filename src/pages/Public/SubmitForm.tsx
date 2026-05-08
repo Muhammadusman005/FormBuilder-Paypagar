@@ -4,6 +4,7 @@ import type { FormField } from '../../types/form';
 import { CheckCircle, ArrowLeft, Loader2 } from 'lucide-react';
 import { FieldInput, FormGrid } from '../../components/shared';
 import { useFormState } from '../../hooks';
+import { logFormSubmission } from '../../utils/fileValidation';
 
 export const SubmitForm = () => {
   const { id } = useParams();
@@ -29,6 +30,7 @@ export const SubmitForm = () => {
   }, [id]);
 
   const onSuccess = () => {
+    logFormSubmission(fields, formData);
     resetForm();
     setSubmitted(true);
   };

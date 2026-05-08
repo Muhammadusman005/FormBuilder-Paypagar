@@ -1,8 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
-import type { FormField, FieldValidation } from '../types/form';
+import type { FormField, FieldValidation, FileType } from '../types/form';
 import { X, Plus, Trash2, ShieldCheck, Zap, LayoutGrid, ChevronDown, ChevronRight, BookmarkPlus, Check } from 'lucide-react';
 import { isValidRegexPattern } from '../utils/validation-engine';
-import { COL_SPAN_OPTIONS, REGEX_PATTERNS, FIELD_TYPE_META } from '../constants';
+import { COL_SPAN_OPTIONS, REGEX_PATTERNS, FIELD_TYPE_META, FILE_TYPE_OPTIONS } from '../constants';
 import type { RegexPattern } from '../constants';
 import { customPatternService } from '../services/customPattern.service';
 
@@ -11,7 +11,7 @@ interface Props {
   onUpdate: (field: FormField) => void;
   onUpdateMultiple?: (fields: FormField[]) => void;
   onClose: () => void;
-  allFields?: FormField[];
+  allFields?: FormField[]
 }
 
 // Collapsible section wrapper
@@ -63,6 +63,7 @@ export const FieldPropertiesPanel = ({ field, onUpdate, onUpdateMultiple, onClos
   const [colSpan, setColSpan] = useState<1 | 2 | 3 | 4>(4);
   const [row, setRow] = useState<number>(0);
   const [validation, setValidation] = useState<FieldValidation>({});
+  const [acceptedFileTypes, setAcceptedFileTypes] = useState<FileType[]>([]);
 
   useEffect(() => {
     if (field) {
@@ -73,12 +74,13 @@ export const FieldPropertiesPanel = ({ field, onUpdate, onUpdateMultiple, onClos
       setColSpan(field.colSpan ?? 4);
       setRow(field.row ?? 0);
       setValidation(field.validation || {});
+      setAcceptedFileTypes(field.acceptedFileTypes || []);
     }
   }, [field?.id]);
 
   const handleChange = useCallback((updates: Partial<FormField>) => {
     if (!field) return;
-    const updated = { ...field, label, placeholder, required, options, colSpan, row, validation, ...updates };
+    const updated = { ...field, label, placeholder, required, options, colSpan, row, validation, acceptedFileTypes, ...updates };
     onUpdate(updated);
     if ('label' in updates) setLabel(updates.label!);
     if ('placeholder' in updates) setPlaceholder(updates.placeholder!);
@@ -87,7 +89,8 @@ export const FieldPropertiesPanel = ({ field, onUpdate, onUpdateMultiple, onClos
     if ('colSpan' in updates) setColSpan(updates.colSpan!);
     if ('row' in updates) setRow(updates.row!);
     if ('validation' in updates) setValidation(updates.validation!);
-  }, [field, label, placeholder, required, options, colSpan, row, validation, onUpdate]);
+    if ('acceptedFileTypes' in updates) setAcceptedFileTypes(updates.acceptedFileTypes!);
+  }, [field, label, placeholder, required, options, colSpan, row, validation, acceptedFileTypes, onUpdate]);
 
   const handleValidationChange = useCallback((patch: Partial<FieldValidation>) => {
     const updated = { ...validation, ...patch };
@@ -248,11 +251,10 @@ export const FieldPropertiesPanel = ({ field, onUpdate, onUpdateMultiple, onClos
                 key={opt.value}
                 onClick={() => handleChange({ colSpan: opt.value })}
                 title={opt.desc}
-                className={`py-1.5 text-xs font-semibold rounded-md border transition-all ${
-                  colSpan === opt.value
-                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
-                    : 'bg-white text-slate-500 border-slate-200 hover:border-indigo-300 hover:text-indigo-600'
-                }`}
+                className={`py-1.5 text-xs font-semibold rounded-md border transition-all ${colSpan === opt.value
+                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                  : 'bg-white text-slate-500 border-slate-200 hover:border-indigo-300 hover:text-indigo-600'
+                  }`}
               >
                 {opt.label}
               </button>
@@ -277,21 +279,20 @@ export const FieldPropertiesPanel = ({ field, onUpdate, onUpdateMultiple, onClos
           </p>
           <div className="space-y-1">
             {[
-              { label: 'Full width',    bars: [4],       spans: [4] },
-              { label: '½ + ½',         bars: [2, 2],    spans: [2, 2] },
-              { label: '⅓ + ⅔',         bars: [1, 3],    spans: [1, 3] },
-              { label: '⅔ + ⅓',         bars: [3, 1],    spans: [3, 1] },
-              { label: '⅓ + ⅓ + ⅓',    bars: [1, 1, 1], spans: [1, 1, 1] },
+              { label: 'Full width', bars: [4], spans: [4] },
+              { label: '½ + ½', bars: [2, 2], spans: [2, 2] },
+              { label: '⅓ + ⅔', bars: [1, 3], spans: [1, 3] },
+              { label: '⅔ + ⅓', bars: [3, 1], spans: [3, 1] },
+              { label: '⅓ + ⅓ + ⅓', bars: [1, 1, 1], spans: [1, 1, 1] },
             ].map(({ label: lbl, bars, spans }) => (
               <button
                 key={lbl}
                 onClick={() => applyPreset(spans)}
                 disabled={!hasMultipleInRow && spans.length > 1}
-                className={`w-full flex items-center gap-2 px-2.5 py-1.5 text-xs rounded-lg border transition-all ${
-                  !hasMultipleInRow && spans.length > 1
-                    ? 'opacity-40 cursor-not-allowed border-slate-100 bg-slate-50'
-                    : 'border-slate-200 bg-white hover:border-indigo-300 hover:bg-indigo-50'
-                }`}
+                className={`w-full flex items-center gap-2 px-2.5 py-1.5 text-xs rounded-lg border transition-all ${!hasMultipleInRow && spans.length > 1
+                  ? 'opacity-40 cursor-not-allowed border-slate-100 bg-slate-50'
+                  : 'border-slate-200 bg-white hover:border-indigo-300 hover:bg-indigo-50'
+                  }`}
               >
                 <div className="flex gap-0.5 flex-1 h-3">
                   {bars.map((flex, i) => (
@@ -334,6 +335,43 @@ export const FieldPropertiesPanel = ({ field, onUpdate, onUpdateMultiple, onClos
               >
                 <Plus className="w-3 h-3" /> Add Option
               </button>
+            </div>
+          </Section>
+        )}
+
+        {/* ── File Types (File Upload) ── */}
+        {field.type === 'file' && (
+          <Section title="Accepted File Type" badge={acceptedFileTypes[0] ? acceptedFileTypes[0].toUpperCase() : 'None'}>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-2">
+                {FILE_TYPE_OPTIONS.map((fileType) => (
+                  <button
+                    key={fileType.value}
+                    onClick={() => {
+                      handleChange({ acceptedFileTypes: [fileType.value as FileType] });
+                    }}
+                    className={`px-2.5 py-1.5 text-xs font-medium rounded-lg border transition-all ${acceptedFileTypes[0] === fileType.value
+                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                      : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300 hover:text-indigo-600'
+                      }`}
+                  >
+                    {fileType.label}
+                  </button>
+                ))}
+              </div>
+              {acceptedFileTypes.length > 0 && (
+                <div className="px-3 py-2 bg-indigo-50 border border-indigo-200 rounded-lg">
+                  <p className="text-[10px] text-indigo-700 font-medium">
+                    ✓ Only <span className="font-bold">{acceptedFileTypes[0].toUpperCase()}</span> files allowed
+                  </p>
+                  <p className="text-[10px] text-indigo-600 mt-1">
+                    Users will see an error if they try to upload other formats
+                  </p>
+                </div>
+              )}
+              {acceptedFileTypes.length === 0 && (
+                <p className="text-[10px] text-slate-400 italic">Select a file type</p>
+              )}
             </div>
           </Section>
         )}
@@ -450,11 +488,10 @@ export const FieldPropertiesPanel = ({ field, onUpdate, onUpdateMultiple, onClos
                     value={validation.regex || ''}
                     onChange={(e) => handleValidationChange({ regex: e.target.value || undefined })}
                     placeholder="/^[A-Z].*$/"
-                    className={`w-full px-2.5 py-1.5 text-xs font-mono border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
-                      validation.regex
-                        ? isValidRegexPattern(validation.regex) ? 'border-emerald-400 bg-emerald-50' : 'border-red-400 bg-red-50'
-                        : 'border-slate-200'
-                    }`}
+                    className={`w-full px-2.5 py-1.5 text-xs font-mono border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 ${validation.regex
+                      ? isValidRegexPattern(validation.regex) ? 'border-emerald-400 bg-emerald-50' : 'border-red-400 bg-red-50'
+                      : 'border-slate-200'
+                      }`}
                   />
                   {validation.regex && (
                     isValidRegexPattern(validation.regex)
@@ -475,11 +512,10 @@ export const FieldPropertiesPanel = ({ field, onUpdate, onUpdateMultiple, onClos
                       {!showSaveInput ? (
                         <button
                           onClick={() => setShowSaveInput(true)}
-                          className={`w-full flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg border transition-all ${
-                            justSaved
-                              ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
-                              : 'bg-white border-dashed border-amber-300 text-amber-700 hover:bg-amber-50'
-                          }`}
+                          className={`w-full flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg border transition-all ${justSaved
+                            ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
+                            : 'bg-white border-dashed border-amber-300 text-amber-700 hover:bg-amber-50'
+                            }`}
                         >
                           {justSaved
                             ? <><Check className="w-3 h-3" /> Saved!</>

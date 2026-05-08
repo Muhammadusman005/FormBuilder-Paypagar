@@ -1,6 +1,21 @@
 // ── Auth ─────────────────────────────────────────────────────────────────────
 export const AUTH_TOKEN_KEY = 'auth_token';
-export const AUTH_USER_KEY  = 'auth_user';
+export const AUTH_USER_KEY = 'auth_user';
+
+// ── File Types ────────────────────────────────────────────────────────────────
+export const FILE_TYPE_OPTIONS = [
+  { value: 'pdf', label: 'PDF', mimeType: 'application/pdf' },
+  { value: 'csv', label: 'CSV', mimeType: 'text/csv' },
+  { value: 'xlsx', label: 'Excel (XLSX)', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
+  { value: 'xls', label: 'Excel (XLS)', mimeType: 'application/vnd.ms-excel' },
+  { value: 'jpg', label: 'JPG', mimeType: 'image/jpeg' },
+  { value: 'jpeg', label: 'JPEG', mimeType: 'image/jpeg' },
+  { value: 'png', label: 'PNG', mimeType: 'image/png' },
+  { value: 'gif', label: 'GIF', mimeType: 'image/gif' },
+  { value: 'doc', label: 'Word (DOC)', mimeType: 'application/msword' },
+  { value: 'docx', label: 'Word (DOCX)', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' },
+  { value: 'txt', label: 'Text', mimeType: 'text/plain' },
+] as const;
 
 // ── Form grid ─────────────────────────────────────────────────────────────────
 export const GRID_COLUMNS = 4;
@@ -17,20 +32,20 @@ export interface FieldTypeMeta {
 }
 
 export const FIELD_TYPE_META: Record<FieldType, FieldTypeMeta> = {
-  text:       { label: 'Text',        icon: Type,              color: 'bg-blue-50 text-blue-600 border-blue-200' },
-  number:     { label: 'Number',      icon: Hash,              color: 'bg-purple-50 text-purple-600 border-purple-200' },
-  dropdown:   { label: 'Dropdown',    icon: ChevronDown,       color: 'bg-amber-50 text-amber-600 border-amber-200' },
-  file:       { label: 'File Upload', icon: Upload,            color: 'bg-green-50 text-green-600 border-green-200' },
-  radio:      { label: 'Radio',       icon: Circle,            color: 'bg-pink-50 text-pink-600 border-pink-200' },
-  checkbox:   { label: 'Checkbox',    icon: CheckSquare,       color: 'bg-cyan-50 text-cyan-600 border-cyan-200' },
+  text: { label: 'Text', icon: Type, color: 'bg-blue-50 text-blue-600 border-blue-200' },
+  number: { label: 'Number', icon: Hash, color: 'bg-purple-50 text-purple-600 border-purple-200' },
+  dropdown: { label: 'Dropdown', icon: ChevronDown, color: 'bg-amber-50 text-amber-600 border-amber-200' },
+  file: { label: 'File Upload', icon: Upload, color: 'bg-green-50 text-green-600 border-green-200' },
+  radio: { label: 'Radio', icon: Circle, color: 'bg-pink-50 text-pink-600 border-pink-200' },
+  checkbox: { label: 'Checkbox', icon: CheckSquare, color: 'bg-cyan-50 text-cyan-600 border-cyan-200' },
   'dual-input': { label: 'Dual Input', icon: SplitSquareHorizontal, color: 'bg-orange-50 text-orange-600 border-orange-200' },
 };
 
 // ── Column span options ───────────────────────────────────────────────────────
 export const COL_SPAN_OPTIONS: { value: 1 | 2 | 3 | 4; label: string; desc: string }[] = [
-  { value: 1, label: '1/4',  desc: 'Quarter' },
-  { value: 2, label: '1/2',  desc: 'Half' },
-  { value: 3, label: '3/4',  desc: 'Three quarters' },
+  { value: 1, label: '1/4', desc: 'Quarter' },
+  { value: 2, label: '1/2', desc: 'Half' },
+  { value: 3, label: '3/4', desc: 'Three quarters' },
   { value: 4, label: 'Full', desc: 'Full width' },
 ];
 

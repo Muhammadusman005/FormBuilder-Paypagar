@@ -12,5 +12,6 @@ export const FileFieldComponent = {
     label: 'File Upload',
     required: false,
     placeholder: 'Upload Statement...',
+    acceptedFileTypes: ['pdf', 'xlsx', 'csv'], // default file types
   }),
 };

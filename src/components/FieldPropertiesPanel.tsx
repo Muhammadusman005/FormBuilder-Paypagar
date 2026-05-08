@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import type { FormField, FieldValidation } from '../types/form';
-import { X, Plus, Trash2, ShieldCheck, Zap, LayoutGrid, ChevronDown, ChevronRight } from 'lucide-react';
+import { X, Plus, Trash2, ShieldCheck, Zap, LayoutGrid, ChevronDown, ChevronRight, BookmarkPlus, Check } from 'lucide-react';
 import { isValidRegexPattern } from '../utils/validation-engine';
 import { COL_SPAN_OPTIONS, REGEX_PATTERNS, FIELD_TYPE_META } from '../constants';
+import type { RegexPattern } from '../constants';
+import { customPatternService } from '../services/customPattern.service';
 
 interface Props {
   field: FormField | null;
@@ -52,46 +54,8 @@ const Section = ({
   );
 };
 
-// Layout preset button
-const PresetBtn = ({
-  label,
-  bars,
-  onClick,
-  disabled,
-}: {
-  label: string;
-  bars: number[];
-  onClick: () => void;
-  disabled?: boolean;
-}) => (
-  <button
-    onClick={onClick}
-    disabled={disabled}
-    title={disabled ? 'Need ≥2 fields in this row' : label}
-    className={`w-full flex items-center gap-2 px-2.5 py-1.5 text-xs rounded-lg border transition-all group ${
-      disabled
-        ? 'opacity-40 cursor-not-allowed border-slate-100 bg-slate-50'
-        : 'border-slate-200 bg-white hover:border-indigo-300 hover:bg-indigo-50 active:scale-95'
-    }`}
-  >
-    <div className="flex gap-0.5 flex-1 h-3">
-      {bars.map((flex, i) => (
-        <div
-          key={i}
-          className={`rounded-sm transition-colors ${
-            disabled ? 'bg-slate-200' : i === 0 ? 'bg-indigo-500 group-hover:bg-indigo-600' : 'bg-indigo-200 group-hover:bg-indigo-300'
-          }`}
-          style={{ flex }}
-        />
-      ))}
-    </div>
-    <span className={`whitespace-nowrap font-medium ${disabled ? 'text-slate-400' : 'text-slate-600 group-hover:text-indigo-700'}`}>
-      {label}
-    </span>
-  </button>
-);
-
 export const FieldPropertiesPanel = ({ field, onUpdate, onUpdateMultiple, onClose, allFields = [] }: Props) => {
+  // ── ALL hooks must be declared before any early return ────────
   const [label, setLabel] = useState('');
   const [placeholder, setPlaceholder] = useState('');
   const [required, setRequired] = useState(false);
@@ -112,7 +76,75 @@ export const FieldPropertiesPanel = ({ field, onUpdate, onUpdateMultiple, onClos
     }
   }, [field?.id]);
 
-  // ── Empty state ────────────────────────────────────────────────
+  const handleChange = useCallback((updates: Partial<FormField>) => {
+    if (!field) return;
+    const updated = { ...field, label, placeholder, required, options, colSpan, row, validation, ...updates };
+    onUpdate(updated);
+    if ('label' in updates) setLabel(updates.label!);
+    if ('placeholder' in updates) setPlaceholder(updates.placeholder!);
+    if ('required' in updates) setRequired(updates.required!);
+    if ('options' in updates) setOptions(updates.options!);
+    if ('colSpan' in updates) setColSpan(updates.colSpan!);
+    if ('row' in updates) setRow(updates.row!);
+    if ('validation' in updates) setValidation(updates.validation!);
+  }, [field, label, placeholder, required, options, colSpan, row, validation, onUpdate]);
+
+  const handleValidationChange = useCallback((patch: Partial<FieldValidation>) => {
+    const updated = { ...validation, ...patch };
+    (Object.keys(updated) as (keyof FieldValidation)[]).forEach((k) => {
+      if (updated[k] === undefined || updated[k] === '') delete updated[k];
+    });
+    handleChange({ validation: updated });
+  }, [validation, handleChange]);
+
+  const applyPreset = useCallback((spans: number[]) => {
+    if (!onUpdateMultiple) return;
+    const rowFields = allFields.filter(f => (f.row ?? 0) === row);
+    const sorted = [...rowFields].sort(
+      (a, b) => allFields.findIndex(x => x.id === a.id) - allFields.findIndex(x => x.id === b.id)
+    );
+    const updated = sorted.map((f, i) => ({
+      ...f,
+      colSpan: (spans[i] ?? spans[spans.length - 1]) as 1 | 2 | 3 | 4,
+    }));
+    onUpdateMultiple(updated);
+  }, [onUpdateMultiple, allFields, row]);
+
+  // ── Custom patterns state — MUST be before early return ───────
+  const [customPatterns, setCustomPatterns] = useState<RegexPattern[]>(() =>
+    customPatternService.getAll()
+  );
+  const [savePatternName, setSavePatternName] = useState('');
+  const [showSaveInput, setShowSaveInput] = useState(false);
+  const [justSaved, setJustSaved] = useState(false);
+
+  useEffect(() => {
+    setCustomPatterns(customPatternService.getAll());
+    setShowSaveInput(false);
+    setSavePatternName('');
+  }, [field?.id]);
+
+  const handleSavePattern = useCallback(() => {
+    if (!validation.regex || !isValidRegexPattern(validation.regex)) return;
+    const saved = customPatternService.save({
+      label: savePatternName.trim() || 'Custom Pattern',
+      pattern: validation.regex,
+      description: 'Custom saved pattern',
+      example: validation.regexMessage || '',
+    });
+    setCustomPatterns(prev => [...prev, saved]);
+    setShowSaveInput(false);
+    setSavePatternName('');
+    setJustSaved(true);
+    setTimeout(() => setJustSaved(false), 2000);
+  }, [validation.regex, validation.regexMessage, savePatternName]);
+
+  const handleDeleteCustomPattern = useCallback((id: string) => {
+    customPatternService.delete(id);
+    setCustomPatterns(prev => prev.filter(p => p.id !== id));
+  }, []);
+
+  // ── Early return AFTER all hooks ──────────────────────────────
   if (!field) {
     return (
       <div className="w-64 bg-white border-l border-slate-100 flex flex-col items-center justify-center flex-shrink-0 gap-3">
@@ -129,44 +161,11 @@ export const FieldPropertiesPanel = ({ field, onUpdate, onUpdateMultiple, onClos
   const meta = FIELD_TYPE_META[field.type];
   const rowFields = allFields.filter(f => (f.row ?? 0) === row);
   const hasMultipleInRow = rowFields.length >= 2;
-
-  const handleChange = (updates: Partial<FormField>) => {
-    const updated = { ...field, label, placeholder, required, options, colSpan, row, validation, ...updates };
-    onUpdate(updated);
-    if ('label' in updates) setLabel(updates.label!);
-    if ('placeholder' in updates) setPlaceholder(updates.placeholder!);
-    if ('required' in updates) setRequired(updates.required!);
-    if ('options' in updates) setOptions(updates.options!);
-    if ('colSpan' in updates) setColSpan(updates.colSpan!);
-    if ('row' in updates) setRow(updates.row!);
-    if ('validation' in updates) setValidation(updates.validation!);
-  };
-
-  const handleValidationChange = (patch: Partial<FieldValidation>) => {
-    const updated = { ...validation, ...patch };
-    (Object.keys(updated) as (keyof FieldValidation)[]).forEach((k) => {
-      if (updated[k] === undefined || updated[k] === '') delete updated[k];
-    });
-    handleChange({ validation: updated });
-  };
-
-  const applyPreset = (spans: number[]) => {
-    if (!onUpdateMultiple) return;
-    const sorted = [...rowFields].sort(
-      (a, b) => allFields.findIndex(x => x.id === a.id) - allFields.findIndex(x => x.id === b.id)
-    );
-    const updated = sorted.map((f, i) => ({
-      ...f,
-      colSpan: (spans[i] ?? spans[spans.length - 1]) as 1 | 2 | 3 | 4,
-    }));
-    onUpdateMultiple(updated);
-  };
+  const hasValidation = Object.keys(validation).length > 0;
 
   const addOption = () => handleChange({ options: [...options, `Option ${options.length + 1}`] });
   const updateOption = (i: number, v: string) => handleChange({ options: options.map((o, j) => j === i ? v : o) });
   const removeOption = (i: number) => handleChange({ options: options.filter((_, j) => j !== i) });
-
-  const hasValidation = Object.keys(validation).length > 0;
 
   return (
     <div className="w-64 bg-white border-l border-slate-100 flex flex-col flex-shrink-0 overflow-hidden shadow-sm">
@@ -206,7 +205,7 @@ export const FieldPropertiesPanel = ({ field, onUpdate, onUpdateMultiple, onClos
             />
           </div>
 
-          {field.type !== 'file' && field.type !== 'radio' && field.type !== 'checkbox' && (
+          {field.type !== 'file' && (
             <div>
               <label className="block text-xs font-medium text-slate-500 mb-1">Placeholder</label>
               <input
@@ -219,7 +218,6 @@ export const FieldPropertiesPanel = ({ field, onUpdate, onUpdateMultiple, onClos
             </div>
           )}
 
-          {/* Required toggle */}
           <div className="flex items-center justify-between py-0.5">
             <div>
               <p className="text-xs font-medium text-slate-700">Required</p>
@@ -236,7 +234,6 @@ export const FieldPropertiesPanel = ({ field, onUpdate, onUpdateMultiple, onClos
 
         {/* ── Width ── */}
         <Section title="Width">
-          {/* Visual bar */}
           <div className="grid grid-cols-4 gap-1">
             {[1, 2, 3, 4].map((col) => (
               <div
@@ -245,7 +242,6 @@ export const FieldPropertiesPanel = ({ field, onUpdate, onUpdateMultiple, onClos
               />
             ))}
           </div>
-          {/* Buttons */}
           <div className="grid grid-cols-4 gap-1">
             {COL_SPAN_OPTIONS.map((opt) => (
               <button
@@ -277,23 +273,43 @@ export const FieldPropertiesPanel = ({ field, onUpdate, onUpdateMultiple, onClos
           <p className="text-[10px] text-slate-400 -mt-1">
             {hasMultipleInRow
               ? `Applies to all ${rowFields.length} fields in this row`
-              : 'Add more fields to this row to use presets'}
+              : 'Drag another field onto this one to share a row'}
           </p>
-
           <div className="space-y-1">
-            <PresetBtn label="Full width" bars={[4]} onClick={() => applyPreset([4])} />
-            <PresetBtn label="½ + ½" bars={[2, 2]} onClick={() => applyPreset([2, 2])} disabled={!hasMultipleInRow} />
-            <PresetBtn label="⅓ + ⅓ + ⅓" bars={[1, 1, 1]} onClick={() => applyPreset([1, 1, 1])} disabled={!hasMultipleInRow} />
-            <PresetBtn label="¼ + ¼ + ¼ + ¼" bars={[1, 1, 1, 1]} onClick={() => applyPreset([1, 1, 1, 1])} disabled={!hasMultipleInRow} />
-            <PresetBtn label="⅓ + ⅔" bars={[1, 3]} onClick={() => applyPreset([1, 3])} disabled={!hasMultipleInRow} />
-            <PresetBtn label="⅔ + ⅓" bars={[3, 1]} onClick={() => applyPreset([3, 1])} disabled={!hasMultipleInRow} />
-            <PresetBtn label="¼ + ¾" bars={[1, 3]} onClick={() => applyPreset([1, 3])} disabled={!hasMultipleInRow} />
-            <PresetBtn label="¾ + ¼" bars={[3, 1]} onClick={() => applyPreset([3, 1])} disabled={!hasMultipleInRow} />
+            {[
+              { label: 'Full width',    bars: [4],       spans: [4] },
+              { label: '½ + ½',         bars: [2, 2],    spans: [2, 2] },
+              { label: '⅓ + ⅔',         bars: [1, 3],    spans: [1, 3] },
+              { label: '⅔ + ⅓',         bars: [3, 1],    spans: [3, 1] },
+              { label: '⅓ + ⅓ + ⅓',    bars: [1, 1, 1], spans: [1, 1, 1] },
+            ].map(({ label: lbl, bars, spans }) => (
+              <button
+                key={lbl}
+                onClick={() => applyPreset(spans)}
+                disabled={!hasMultipleInRow && spans.length > 1}
+                className={`w-full flex items-center gap-2 px-2.5 py-1.5 text-xs rounded-lg border transition-all ${
+                  !hasMultipleInRow && spans.length > 1
+                    ? 'opacity-40 cursor-not-allowed border-slate-100 bg-slate-50'
+                    : 'border-slate-200 bg-white hover:border-indigo-300 hover:bg-indigo-50'
+                }`}
+              >
+                <div className="flex gap-0.5 flex-1 h-3">
+                  {bars.map((flex, i) => (
+                    <div
+                      key={i}
+                      className={`rounded-sm ${i === 0 ? 'bg-indigo-500' : 'bg-indigo-200'}`}
+                      style={{ flex }}
+                    />
+                  ))}
+                </div>
+                <span className="text-slate-600 font-medium whitespace-nowrap">{lbl}</span>
+              </button>
+            ))}
           </div>
         </Section>
 
-        {/* ── Options (Dropdown / Radio / Checkbox) ── */}
-        {(field.type === 'dropdown' || field.type === 'radio' || field.type === 'checkbox') && (
+        {/* ── Options (Dropdown) ── */}
+        {field.type === 'dropdown' && (
           <Section title="Options" badge={`${options.length}`}>
             <div className="space-y-1.5">
               {options.map((opt, i) => (
@@ -322,36 +338,6 @@ export const FieldPropertiesPanel = ({ field, onUpdate, onUpdateMultiple, onClos
           </Section>
         )}
 
-        {/* ── Dual Input Labels ── */}
-        {field.type === 'dual-input' && (
-          <Section title="Input Labels" badge="2 fields">
-            <div>
-              <label className="block text-xs font-medium text-slate-500 mb-1">First input label</label>
-              <input
-                type="text"
-                value={field.dualInputLabels?.[0] ?? 'Min'}
-                onChange={(e) => {
-                  const labels: [string, string] = [e.target.value, field.dualInputLabels?.[1] ?? 'Max'];
-                  handleChange({ dualInputLabels: labels });
-                }}
-                className="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-2"
-                placeholder="e.g. Min, From, Start"
-              />
-              <label className="block text-xs font-medium text-slate-500 mb-1">Second input label</label>
-              <input
-                type="text"
-                value={field.dualInputLabels?.[1] ?? 'Max'}
-                onChange={(e) => {
-                  const labels: [string, string] = [field.dualInputLabels?.[0] ?? 'Min', e.target.value];
-                  handleChange({ dualInputLabels: labels });
-                }}
-                className="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                placeholder="e.g. Max, To, End"
-              />
-            </div>
-          </Section>
-        )}
-
         {/* ── Validation ── */}
         {(field.type === 'text' || field.type === 'number') && (
           <Section
@@ -362,7 +348,6 @@ export const FieldPropertiesPanel = ({ field, onUpdate, onUpdateMultiple, onClos
           >
             {field.type === 'text' && (
               <div className="space-y-3">
-                {/* Quick patterns */}
                 <div>
                   <label className="flex items-center gap-1 text-xs font-medium text-slate-500 mb-1">
                     <Zap className="w-3 h-3 text-amber-500" /> Quick Patterns
@@ -370,7 +355,8 @@ export const FieldPropertiesPanel = ({ field, onUpdate, onUpdateMultiple, onClos
                   <select
                     onChange={(e) => {
                       if (e.target.value) {
-                        const p = REGEX_PATTERNS.find(x => x.id === e.target.value);
+                        const allP = [...REGEX_PATTERNS, ...customPatterns];
+                        const p = allP.find(x => x.id === e.target.value);
                         if (p) {
                           handleValidationChange({ regex: p.pattern, regexMessage: `Must match ${p.label.toLowerCase()}` });
                           e.target.value = '';
@@ -380,13 +366,45 @@ export const FieldPropertiesPanel = ({ field, onUpdate, onUpdateMultiple, onClos
                     className="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
                   >
                     <option value="">Select a pattern…</option>
-                    {REGEX_PATTERNS.map((p) => (
-                      <option key={p.id} value={p.id}>{p.label} — {p.example}</option>
-                    ))}
+                    <optgroup label="Built-in">
+                      {REGEX_PATTERNS.map((p) => (
+                        <option key={p.id} value={p.id}>{p.label} — {p.example}</option>
+                      ))}
+                    </optgroup>
+                    {customPatterns.length > 0 && (
+                      <optgroup label="My Saved Patterns">
+                        {customPatterns.map((p) => (
+                          <option key={p.id} value={p.id}>⭐ {p.label}</option>
+                        ))}
+                      </optgroup>
+                    )}
                   </select>
+
+                  {/* Saved custom patterns list */}
+                  {customPatterns.length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wide">Saved patterns</p>
+                      {customPatterns.map((p) => (
+                        <div key={p.id} className="flex items-center gap-1.5 px-2 py-1 bg-amber-50 border border-amber-100 rounded-md">
+                          <span className="text-[10px] text-amber-700 font-medium flex-1 truncate">{p.label}</span>
+                          <button
+                            onClick={() => handleValidationChange({ regex: p.pattern, regexMessage: `Must match ${p.label.toLowerCase()}` })}
+                            className="text-[10px] text-indigo-600 hover:text-indigo-800 font-medium flex-shrink-0"
+                          >
+                            Use
+                          </button>
+                          <button
+                            onClick={() => handleDeleteCustomPattern(p.id)}
+                            className="p-0.5 text-slate-300 hover:text-red-500 transition-colors flex-shrink-0"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
-                {/* Min / Max length side by side */}
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <label className="block text-xs font-medium text-slate-500 mb-1">Min length</label>
@@ -410,23 +428,21 @@ export const FieldPropertiesPanel = ({ field, onUpdate, onUpdateMultiple, onClos
                   </div>
                 </div>
 
-                {/* Custom messages for min/max */}
                 {validation.minLength !== undefined && (
                   <input type="text" value={validation.minLengthMessage || ''}
                     onChange={(e) => handleValidationChange({ minLengthMessage: e.target.value || undefined })}
-                    placeholder={`Min length error message`}
+                    placeholder="Min length error message"
                     className="w-full px-2.5 py-1.5 text-xs border border-slate-200 bg-slate-50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                 )}
                 {validation.maxLength !== undefined && (
                   <input type="text" value={validation.maxLengthMessage || ''}
                     onChange={(e) => handleValidationChange({ maxLengthMessage: e.target.value || undefined })}
-                    placeholder={`Max length error message`}
+                    placeholder="Max length error message"
                     className="w-full px-2.5 py-1.5 text-xs border border-slate-200 bg-slate-50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                 )}
 
-                {/* Regex */}
                 <div>
                   <label className="block text-xs font-medium text-slate-500 mb-1">Regex Pattern</label>
                   <input
@@ -451,6 +467,56 @@ export const FieldPropertiesPanel = ({ field, onUpdate, onUpdateMultiple, onClos
                       placeholder="Error message for this pattern"
                       className="w-full mt-1.5 px-2.5 py-1.5 text-xs border border-slate-200 bg-slate-50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     />
+                  )}
+
+                  {/* ── Save to Quick Patterns ── */}
+                  {validation.regex && isValidRegexPattern(validation.regex) && (
+                    <div className="mt-2">
+                      {!showSaveInput ? (
+                        <button
+                          onClick={() => setShowSaveInput(true)}
+                          className={`w-full flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg border transition-all ${
+                            justSaved
+                              ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
+                              : 'bg-white border-dashed border-amber-300 text-amber-700 hover:bg-amber-50'
+                          }`}
+                        >
+                          {justSaved
+                            ? <><Check className="w-3 h-3" /> Saved!</>
+                            : <><BookmarkPlus className="w-3 h-3" /> Save to Quick Patterns</>
+                          }
+                        </button>
+                      ) : (
+                        <div className="space-y-1.5">
+                          <input
+                            type="text"
+                            value={savePatternName}
+                            onChange={(e) => setSavePatternName(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleSavePattern();
+                              if (e.key === 'Escape') { setShowSaveInput(false); setSavePatternName(''); }
+                            }}
+                            placeholder="Pattern name (e.g. CNIC Format)"
+                            autoFocus
+                            className="w-full px-2.5 py-1.5 text-xs border border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-400 bg-amber-50/50"
+                          />
+                          <div className="flex gap-1.5">
+                            <button
+                              onClick={handleSavePattern}
+                              className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-xs font-medium bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors"
+                            >
+                              <BookmarkPlus className="w-3 h-3" /> Save
+                            </button>
+                            <button
+                              onClick={() => { setShowSaveInput(false); setSavePatternName(''); }}
+                              className="px-2.5 py-1.5 text-xs text-slate-500 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
@@ -498,6 +564,7 @@ export const FieldPropertiesPanel = ({ field, onUpdate, onUpdateMultiple, onClos
             )}
           </Section>
         )}
+
       </div>
     </div>
   );

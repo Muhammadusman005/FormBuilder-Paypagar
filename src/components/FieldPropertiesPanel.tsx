@@ -308,8 +308,8 @@ export const FieldPropertiesPanel = ({ field, onUpdate, onUpdateMultiple, onClos
           </div>
         </Section>
 
-        {/* ── Options (Dropdown) ── */}
-        {field.type === 'dropdown' && (
+        {/* ── Options (Dropdown / Radio / Checkbox) ── */}
+        {(field.type === 'dropdown' || field.type === 'radio' || field.type === 'checkbox') && (
           <Section title="Options" badge={`${options.length}`}>
             <div className="space-y-1.5">
               {options.map((opt, i) => (

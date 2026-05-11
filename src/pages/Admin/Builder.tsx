@@ -10,6 +10,7 @@ import { SubFormManager }      from '../../components/SubFormManager';
 import { FIELD_COMPONENTS }    from '../../components/FieldComponents';
 import { useFormLoader, useFormSync } from '../../hooks';
 import { insertFieldIntoRow, insertFieldAsNewRow, nextRowIndex } from '../../utils/fieldLayout';
+import { storageService }      from '../../services/storage.service';
 import { Save, ArrowLeft, CheckCircle, Circle, Eye, Pencil, Braces, Menu } from 'lucide-react';
 
 export const Builder = () => {
@@ -354,12 +355,21 @@ export const Builder = () => {
             onSubmit={handlePreviewSubmit}
           />
         ) : (
-          <FormJsonView form={{
-            ...form,
-            sub_forms: form.sub_forms.map(sf =>
-              sf.id === selectedSubFormId ? { ...sf, fields } : sf
-            ),
-          }} />
+          <FormJsonView
+            form={{
+              ...form,
+              sub_forms: form.sub_forms.map(sf =>
+                sf.id === selectedSubFormId ? { ...sf, fields } : sf
+              ),
+            }}
+            onFormChange={(updated) => {
+              setForm(updated);
+              storageService.saveForm(updated);
+              // Sync local fields from the updated sub-form
+              const updatedSubForm = updated.sub_forms.find(sf => sf.id === selectedSubFormId);
+              if (updatedSubForm) setFields(updatedSubForm.fields);
+            }}
+          />
         )}
       </div>
     </div>

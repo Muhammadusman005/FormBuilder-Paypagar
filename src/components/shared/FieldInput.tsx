@@ -10,6 +10,7 @@
  * - File input reset key
  */
 import type { FormField } from '../../types/form';
+import { getAcceptAttribute, validateAndLogFile, logFieldInput } from '../../utils/fileValidation';
 
 interface Props {
   field: FormField;
@@ -38,7 +39,10 @@ export const FieldInput = ({ field, value, error, onChange, fileResetKey, classN
           type="text"
           placeholder={field.placeholder}
           value={String(value ?? '')}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(e) => {
+            logFieldInput(field.label, field.id, e.target.value);
+            onChange(e.target.value);
+          }}
           className={inputClasses}
         />
       )}
@@ -48,7 +52,10 @@ export const FieldInput = ({ field, value, error, onChange, fileResetKey, classN
           type="number"
           placeholder={field.placeholder}
           value={String(value ?? '')}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(e) => {
+            logFieldInput(field.label, field.id, e.target.value);
+            onChange(e.target.value);
+          }}
           className={inputClasses}
         />
       )}
@@ -56,7 +63,10 @@ export const FieldInput = ({ field, value, error, onChange, fileResetKey, classN
       {field.type === 'dropdown' && (
         <select
           value={String(value ?? '')}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(e) => {
+            logFieldInput(field.label, field.id, e.target.value);
+            onChange(e.target.value);
+          }}
           className={inputClasses}
         >
           <option value="">{field.placeholder || 'Select an option'}</option>
@@ -72,7 +82,18 @@ export const FieldInput = ({ field, value, error, onChange, fileResetKey, classN
         <input
           key={fileResetKey}
           type="file"
-          onChange={(e) => onChange(e.target.files?.[0])}
+          accept={getAcceptAttribute(field.acceptedFileTypes)}
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) {
+              const isValid = validateAndLogFile(file, field.label, field.id, field.acceptedFileTypes);
+              if (!isValid) {
+                e.target.value = ''; // Clear the input
+                return;
+              }
+            }
+            onChange(file);
+          }}
           className={inputClasses}
         />
       )}

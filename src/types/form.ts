@@ -1,5 +1,7 @@
 export type FieldType = 'text' | 'number' | 'dropdown' | 'file' | 'radio' | 'checkbox' | 'dual-input';
 
+export type FileType = 'pdf' | 'csv' | 'xlsx' | 'xls' | 'jpg' | 'jpeg' | 'png' | 'gif' | 'doc' | 'docx' | 'txt';
+
 export interface FieldValidation {
   regex?: string;               // custom regex pattern (text fields)
   regexMessage?: string;        // message shown when regex fails
@@ -26,6 +28,7 @@ export interface FormField {
   row?: number;             // row index for grouping fields in the same row
   validation?: FieldValidation;
   dualInputLabels?: [string, string]; // labels for dual-input fields (e.g. ['Min', 'Max'])
+  acceptedFileTypes?: FileType[]; // accepted file types for file upload fields
 }
 
 export interface SubForm {

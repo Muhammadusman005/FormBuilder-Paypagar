@@ -2,6 +2,7 @@ import type { FormField } from '../types/form';
 import { Layers } from 'lucide-react';
 import { FieldInput, FormGrid } from '../components/shared';
 import { useFormState } from '../hooks';
+import { logFormSubmission } from '../utils/fileValidation';
 
 interface Props {
   title: string;
@@ -21,6 +22,7 @@ export const FormPreview = ({ title, fields, formData, onInputChange, onSubmit }
 
   const handleFormSubmit = (e: React.FormEvent) => {
     handleSubmit(e, fields, () => {
+      logFormSubmission(fields, formData);
       onSubmit();
       resetForm();
     });

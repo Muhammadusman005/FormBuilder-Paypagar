@@ -77,6 +77,82 @@ export const FieldInput = ({ field, value, error, onChange, fileResetKey, classN
         />
       )}
 
+      {field.type === 'radio' && (
+        <div className="space-y-1.5">
+          {field.options?.map((opt) => (
+            <label key={opt} className="flex items-center gap-2 cursor-pointer group">
+              <input
+                type="radio"
+                name={field.id}
+                value={opt}
+                checked={value === opt}
+                onChange={(e) => onChange(e.target.value)}
+                className="w-4 h-4 text-indigo-600 border-slate-300 focus:ring-indigo-500"
+              />
+              <span className="text-sm text-slate-700 group-hover:text-slate-900">{opt}</span>
+            </label>
+          ))}
+        </div>
+      )}
+
+      {field.type === 'checkbox' && (
+        <div className="space-y-1.5">
+          {field.options?.map((opt) => {
+            const selected = Array.isArray(value) ? (value as string[]).includes(opt) : false;
+            return (
+              <label key={opt} className="flex items-center gap-2 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  value={opt}
+                  checked={selected}
+                  onChange={(e) => {
+                    const arr = Array.isArray(value) ? [...(value as string[])] : [];
+                    if (e.target.checked) {
+                      arr.push(opt);
+                    } else {
+                      const idx = arr.indexOf(opt);
+                      if (idx !== -1) arr.splice(idx, 1);
+                    }
+                    onChange(arr);
+                  }}
+                  className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500"
+                />
+                <span className="text-sm text-slate-700 group-hover:text-slate-900">{opt}</span>
+              </label>
+            );
+          })}
+        </div>
+      )}
+
+      {field.type === 'dual-input' && (
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1">
+              {(field.dualInputLabels?.[0]) || 'First'}
+            </label>
+            <input
+              type="text"
+              placeholder={field.placeholder}
+              value={(value as { first?: string })?.first ?? ''}
+              onChange={(e) => onChange({ ...(value as object || {}), first: e.target.value })}
+              className={inputClasses}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1">
+              {(field.dualInputLabels?.[1]) || 'Second'}
+            </label>
+            <input
+              type="text"
+              placeholder={field.placeholder}
+              value={(value as { second?: string })?.second ?? ''}
+              onChange={(e) => onChange({ ...(value as object || {}), second: e.target.value })}
+              className={inputClasses}
+            />
+          </div>
+        </div>
+      )}
+
       {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
     </div>
   );

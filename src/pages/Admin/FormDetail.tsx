@@ -1,74 +1,43 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Plus, Edit2, Trash2, ChevronRight } from 'lucide-react';
-import type { FormSchema, SubForm } from '../../types/form';
-import { storageService } from '../../services/storage.service';
+import { ArrowLeft, Plus, Edit2, Trash2 } from 'lucide-react';
+import type { SubForm } from '../../types/form';
+import { useFormLoader, useFormSync } from '../../hooks';
 
 export const FormDetail = () => {
   const navigate = useNavigate();
   const { formId } = useParams<{ formId: string }>();
 
-  const [form, setForm] = useState<FormSchema | null>(null);
-  const [subFormName, setSubFormName] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('personal_info');
-  const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
+  const { form, setForm, isLoading } = useFormLoader(formId, { notFoundRedirect: '/admin' });
+  const [subFormName,       setSubFormName]       = useState('');
+  const [error,             setError]             = useState('');
 
-  // Load form on mount
-  useEffect(() => {
-    if (formId) {
-      const loadedForm = storageService.getFormById(formId);
-      if (loadedForm) {
-        setForm(loadedForm);
-      } else {
-        navigate('/admin');
-      }
-    }
-    setIsLoading(false);
-  }, [formId, navigate]);
+  // Dummy fields/setFields — FormDetail doesn't edit fields, only sub-forms
+  const [fields, setFields] = useState([]);
+  const { addSubForm, deleteSubForm } = useFormSync({
+    form, setForm, selectedSubFormId: null, fields, setFields,
+  });
 
   const handleAddSubForm = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-
-    if (!subFormName.trim()) {
-      setError('Sub-form name is required');
-      return;
-    }
-
+    if (!subFormName.trim()) { setError('Sub-form name is required'); return; }
     if (!form) return;
 
     const newSubForm: SubForm = {
       id: Date.now().toString(),
       name: subFormName.trim(),
-      category: selectedCategory,
       fields: [],
     };
-
-    const updatedForm = {
-      ...form,
-      sub_forms: [...form.sub_forms, newSubForm],
-    };
-
-    storageService.saveForm(updatedForm);
-    setForm(updatedForm);
+    addSubForm(newSubForm, { save: true });
     setSubFormName('');
-    
-    // Navigate to builder with the newly created sub-form
     navigate(`/admin/builder/${form.id}?subform=${newSubForm.id}`);
   };
 
   const handleDeleteSubForm = (subFormId: string) => {
     if (!form) return;
-
     if (confirm('Delete this sub-form?')) {
-      const updatedForm = {
-        ...form,
-        sub_forms: form.sub_forms.filter(sf => sf.id !== subFormId),
-      };
-
-      storageService.saveForm(updatedForm);
-      setForm(updatedForm);
+      deleteSubForm(subFormId, { save: true });
     }
   };
 

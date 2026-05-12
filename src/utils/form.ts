@@ -42,8 +42,12 @@ export const buildFormSchema = (title: string, fields: FormField[]) => ({
         if (field.placeholder)                    base.placeholder = field.placeholder;
         if (field.colSpan && field.colSpan !== 4) base.colSpan     = field.colSpan;
 
-        if (field.type === 'dropdown' && field.options?.length) {
+        if ((field.type === 'dropdown' || field.type === 'radio' || field.type === 'checkbox') && field.options?.length) {
           base.choices = field.options;
+        }
+
+        if (field.type === 'dual-input' && field.dualInputLabels) {
+          base.dualInputLabels = field.dualInputLabels;
         }
 
         if (field.validation && Object.keys(field.validation).length > 0) {

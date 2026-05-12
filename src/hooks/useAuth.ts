@@ -33,7 +33,7 @@ export function useAuth(): UseAuthReturn {
     }
   }, []);
 
-  const login = useCallback(async (payload: LoginPayload) => {
+  const login = useCallback(async (payload: LoginPayload) => {  
     setLoading(true);
     setError(null);
     try {

@@ -41,7 +41,7 @@ export const FormJsonView = ({ form, onFormChange }: Props) => {
       setTimeout(() => setApplied(false), 2000);
     } catch (e) {
       setError(`JSON parse error: ${(e as Error).message}`);
-    }
+    }``
   };
 
   const handleChange = (value: string) => {

@@ -29,7 +29,7 @@ export const Builder = () => {
   const [draggedId,     setDraggedId]     = useState<string | null>(null);
   const [draggedComponentType, setDraggedComponentType] = useState<string | null>(null);
   const [activeTab,     setActiveTab]     = useState<'designer' | 'preview' | 'json'>('designer');
-  const [formData,      setFormData]      = useState<Record<string, unknown>>({});
+  const [formData,      x]      = useState<Record<string, unknown>>({});
   const [saved,         setSaved]         = useState(false);
 
   // ── Sync sub-form fields when form loads ───────────────────────
